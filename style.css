@@ -14,15 +14,17 @@
 @media(max-width:720px){#ghw-dialog{width:100vw;height:100dvh;margin:0;max-width:none;max-height:none}.ghw-shell{border:0;border-radius:0;padding-top:env(safe-area-inset-top)}.ghw-header{min-height:62px}.ghw-main{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}.ghw-categories{display:flex;overflow-x:auto;overflow-y:hidden;border-right:0;border-bottom:1px solid rgba(255,255,255,.08);padding:7px}.ghw-category{width:auto;min-width:max-content;grid-template-columns:18px auto auto;padding:8px 10px}.ghw-category span{font-size:10px}.ghw-browser{padding:10px}.ghw-browser-head{top:-10px;margin:-10px -10px 8px;padding:10px;display:block}.ghw-browser-head label{min-width:0;margin-top:8px}.ghw-item-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ghw-item{min-height:60px}.ghw-selected-row{grid-template-columns:minmax(0,1fr) 130px 32px}.ghw-personbar{padding:8px 12px}.ghw-tools{padding:7px 10px}.ghw-footer{min-height:58px}}
 @media(max-width:390px){.ghw-item-grid{grid-template-columns:1fr 1fr}.ghw-selected-row{grid-template-columns:1fr 115px 30px}.ghw-brand small{display:none}}
 
-/* v1.1.0 semantic per-item wardrobe glyphs */
+/* v1.2.0 custom vector clothing/accessory icons */
 .ghw-item>.ghw-item-glyph{
-  width:30px;height:30px;display:grid;place-items:center;flex:0 0 30px;
-  border-radius:9px;background:#242832;font-size:20px;line-height:1;
+  width:34px;height:34px;display:grid;place-items:center;flex:0 0 34px;
+  border-radius:10px;background:#242832;color:#c8cdd8;
 }
-.ghw-item.selected>.ghw-item-glyph{background:#6048bc}
+.ghw-item>.ghw-item-glyph svg{width:27px;height:27px;display:block;overflow:visible}
+.ghw-item.selected>.ghw-item-glyph{background:#6048bc;color:#fff}
 .ghw-selected-name{display:flex!important;align-items:center;gap:7px;min-width:0}
 .ghw-selected-name .ghw-item-glyph{
-  width:26px;height:26px;display:grid;place-items:center;flex:0 0 26px;
-  border-radius:8px;background:#242832;font-size:17px;line-height:1;
+  width:28px;height:28px;display:grid;place-items:center;flex:0 0 28px;
+  border-radius:8px;background:#242832;color:#c8cdd8;
 }
+.ghw-selected-name .ghw-item-glyph svg{width:22px;height:22px;display:block}
 .ghw-selected-name em{font-style:normal;min-width:0}

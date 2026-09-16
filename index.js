@@ -1,7 +1,7 @@
 import { COLORS, CATALOG } from './catalog.js';
 
 const GHW_MODULE = 'greyhaven-wardrobe';
-const GHW_VERSION = '1.1.0';
+const GHW_VERSION = '1.2.0';
 const META_KEY = 'greyhavenWardrobe';
 const PROMPT_KEY = 'greyhaven_wardrobe_state';
 const PROMPT_POSITION = 1;
@@ -432,104 +432,334 @@ function categoryButtons() {
 }
 
 
-function itemGlyph(categoryId, item) {
+function iconKind(categoryId, item) {
   const text = lc(`${item?.id || ''} ${item?.label || ''}`);
-
   const has = (...words) => words.some(word => text.includes(word));
-  if (categoryId === 'bra') return has('sports') ? '🎽' : has('corset','bustier','longline') ? '🎀' : '👙';
-  if (categoryId === 'underwear') return has('boxer','short','long john','thermal') ? '🩳' : '🩲';
+
+  if (categoryId === 'underwear') {
+    if (has('g-string','g string')) return 'gstring';
+    if (has('thong')) return 'thong';
+    if (has('jockstrap')) return 'jockstrap';
+    if (has('boxer briefs','boxer brief')) return 'boxerbriefs';
+    if (has('boxers')) return 'boxers';
+    if (has('boyshort')) return 'boyshort';
+    if (has('trunks')) return 'trunks';
+    if (has('high-waisted','high waisted')) return 'highbrief';
+    if (has('bikini')) return 'bikinibrief';
+    if (has('cheeky')) return 'cheeky';
+    if (has('long john','thermal')) return 'longjohn';
+    if (has('compression')) return 'sportbrief';
+    return 'briefs';
+  }
+  if (categoryId === 'bra') {
+    if (has('sports')) return 'sportsbra';
+    if (has('strapless','bandeau')) return 'straplessbra';
+    if (has('bralette')) return 'bralette';
+    if (has('corset','bustier','longline')) return 'corset';
+    if (has('plunge')) return 'plungebra';
+    return 'bra';
+  }
   if (categoryId === 'top') {
-    if (has('lab coat','chef jacket','scrub')) return '🥼';
-    if (has('hoodie','sweater','cardigan','sweatshirt','jacket')) return '🧥';
-    if (has('tank','jersey','running','sports','compression')) return '🎽';
-    if (has('blouse','camisole','halter','crop','tube','peplum')) return '👚';
-    if (has('corset','bustier','bodice')) return '🎀';
-    return '👕';
+    if (has('hoodie')) return 'hoodie';
+    if (has('sweater','sweatshirt','cardigan')) return 'sweater';
+    if (has('tank','camisole','singlet')) return 'tank';
+    if (has('crop')) return 'croptop';
+    if (has('tube')) return 'tubetop';
+    if (has('polo')) return 'polo';
+    if (has('blouse','button','dress shirt','shirt')) return 'shirt';
+    if (has('jersey','sports','running','compression')) return 'jersey';
+    if (has('corset','bustier')) return 'corset';
+    return 'tshirt';
   }
   if (categoryId === 'bottom') {
-    if (has('short')) return '🩳';
-    if (has('skirt','sarong','kilt')) return '👗';
-    return '👖';
+    if (has('mini skirt')) return 'miniskirt';
+    if (has('pleated skirt')) return 'pleatedskirt';
+    if (has('pencil skirt')) return 'pencilskirt';
+    if (has('maxi skirt','long skirt')) return 'maxiskirt';
+    if (has('skirt','sarong','kilt')) return 'skirt';
+    if (has('cargo')) return 'cargopants';
+    if (has('jogger','sweatpant')) return 'joggers';
+    if (has('legging','yoga')) return 'leggings';
+    if (has('flare','wide-leg','wide leg','bell-bottom')) return 'flarepants';
+    if (has('jean','denim')) return 'jeans';
+    if (has('chino','dress pant','trouser','slack')) return 'trousers';
+    if (has('short')) return 'shorts';
+    return 'pants';
   }
   if (categoryId === 'onepiece') {
-    if (has('jumpsuit','romper','bodysuit','leotard','unitard')) return '🩱';
-    if (has('overall')) return '👖';
-    if (has('robe','kimono','kaftan')) return '🥻';
-    return '👗';
+    if (has('jumpsuit')) return 'jumpsuit';
+    if (has('romper')) return 'romper';
+    if (has('bodysuit','leotard','unitard')) return 'bodysuit';
+    if (has('robe','kimono','kaftan')) return 'robe';
+    if (has('overall')) return 'overalls';
+    return 'dress';
   }
   if (categoryId === 'outerwear') {
-    if (has('blazer','suit')) return '🤵';
-    if (has('rain','poncho')) return '🌧️';
-    if (has('cardigan','shawl')) return '🧶';
-    return '🧥';
+    if (has('blazer','suit')) return 'blazer';
+    if (has('vest','gilet')) return 'vest';
+    if (has('poncho','cape')) return 'cape';
+    if (has('rain')) return 'raincoat';
+    if (has('puffer')) return 'puffer';
+    return 'coat';
   }
-  if (categoryId === 'sleepwear') return has('robe') ? '🧖' : has('nightgown','slip') ? '👗' : '🌙';
-  if (categoryId === 'swim_top') return '👙';
-  if (categoryId === 'swim_bottom') return has('short','trunk','board') ? '🩳' : '👙';
-  if (categoryId === 'socks' || categoryId === 'hosiery') return '🧦';
+  if (categoryId === 'sleepwear') return has('robe') ? 'robe' : has('nightgown','slip') ? 'nightgown' : has('short') ? 'pajamashorts' : 'pajamas';
+  if (categoryId === 'swim_top') return has('triangle') ? 'trianglebikini' : has('bandeau') ? 'straplessbra' : 'bikinitop';
+  if (categoryId === 'swim_bottom') return has('board','trunk','short') ? 'swimshorts' : has('thong') ? 'thong' : has('high-waist') ? 'highbrief' : 'bikinibrief';
+  if (categoryId === 'socks') {
+    if (has('no-show','no show','liner')) return 'noshow';
+    if (has('ankle')) return 'anklesock';
+    if (has('knee')) return 'kneesock';
+    if (has('thigh')) return 'thighsock';
+    return 'crewsock';
+  }
+  if (categoryId === 'hosiery') {
+    if (has('fishnet')) return 'fishnet';
+    if (has('garter')) return 'garterstockings';
+    if (has('thigh-high','thigh high')) return 'thighstockings';
+    if (has('knee-high','knee high')) return 'kneestockings';
+    if (has('tights','pantyhose')) return 'tights';
+    return 'stockings';
+  }
   if (categoryId === 'footwear') {
-    if (has('barefoot')) return '🦶';
-    if (has('flip-flop','slides')) return '🩴';
-    if (has('sandal')) return '👡';
-    if (has('slipper','flat','loafer','ballet')) return '🥿';
-    if (has('heel','pump','stiletto','platform')) return '👠';
-    if (has('boot')) return '👢';
-    if (has('oxford','derby','dress shoe','monk')) return '👞';
-    if (has('skate')) return '⛸️';
-    if (has('ski')) return '🎿';
-    return '👟';
+    if (has('barefoot')) return 'barefoot';
+    if (has('flip-flop','flip flop','slide')) return 'slides';
+    if (has('sandal')) return 'sandal';
+    if (has('heel','stiletto','pump')) return 'heel';
+    if (has('ankle boot')) return 'ankleboot';
+    if (has('boot')) return 'boot';
+    if (has('loafer','oxford','derby','monk','dress shoe')) return 'dressshoe';
+    if (has('slipper')) return 'slipper';
+    return 'sneaker';
   }
   if (categoryId === 'headwear') {
-    if (has('cap')) return '🧢';
-    if (has('crown','tiara')) return '👑';
-    if (has('cowboy')) return '🤠';
-    if (has('sun hat','straw','floppy')) return '👒';
-    if (has('helmet','hard hat')) return '⛑️';
-    if (has('beanie')) return '🧶';
-    return '🎩';
+    if (has('beanie')) return 'beanie';
+    if (has('cap')) return 'cap';
+    if (has('cowboy')) return 'cowboyhat';
+    if (has('sun','floppy','straw')) return 'sunhat';
+    if (has('helmet','hard hat')) return 'helmet';
+    if (has('crown','tiara')) return 'crown';
+    return 'hat';
   }
-  if (categoryId === 'eyewear') return has('sun') ? '🕶️' : has('goggle') ? '🥽' : '👓';
-  if (categoryId === 'earrings') return has('pearl') ? '⚪' : '💎';
-  if (categoryId === 'necklaces') return has('pearl','bead','rosary') ? '📿' : '💎';
-  if (categoryId === 'bracelets') return has('anklet') ? '✨' : '🔗';
-  if (categoryId === 'rings') return '💍';
-  if (categoryId === 'watches') return has('pocket') ? '🕰️' : '⌚';
-  if (categoryId === 'belts') return has('suspender') ? '👔' : '➰';
+  if (categoryId === 'eyewear') return has('sun') ? 'sunglasses' : has('goggle') ? 'goggles' : has('monocle') ? 'monocle' : 'glasses';
+  if (categoryId === 'necklaces') {
+    if (has('cuban')) return 'cubanchain';
+    if (has('rope chain','rope necklace')) return 'ropechain';
+    if (has('box chain')) return 'boxchain';
+    if (has('figaro')) return 'figarochain';
+    if (has('pearl','bead')) return 'pearlnecklace';
+    if (has('layered')) return 'layerednecklace';
+    if (has('locket')) return 'locket';
+    if (has('choker') && has('velvet')) return 'velvetchoker';
+    if (has('chain choker')) return 'chainchoker';
+    if (has('choker')) return 'choker';
+    if (has('collar')) return 'collarnecklace';
+    if (has('statement')) return 'statementnecklace';
+    if (has('cross')) return 'crossnecklace';
+    if (has('dog tag')) return 'dogtag';
+    return 'pendant';
+  }
+  if (categoryId === 'earrings') return has('hoop') ? 'hoopearring' : has('stud') ? 'studearring' : has('drop','dangle') ? 'dangleearring' : 'earring';
+  if (categoryId === 'bracelets') return has('cuff') ? 'cuffbracelet' : has('bead') ? 'beadbracelet' : has('tennis') ? 'tennisbracelet' : 'chainbracelet';
+  if (categoryId === 'rings') return has('signet') ? 'signetring' : has('band','wedding') ? 'bandring' : has('gem','stone','diamond') ? 'gemring' : 'ring';
+  if (categoryId === 'watches') return has('smart') ? 'smartwatch' : has('digital') ? 'digitalwatch' : has('pocket') ? 'pocketwatch' : 'watch';
+  if (categoryId === 'belts') return has('suspender') ? 'suspenders' : has('chain') ? 'chainbelt' : 'belt';
   if (categoryId === 'bags') {
-    if (has('backpack')) return '🎒';
-    if (has('briefcase','laptop')) return '💼';
-    if (has('suitcase','carry-on','garment bag')) return '🧳';
-    if (has('shopping','tote','shopper')) return '🛍️';
-    if (has('clutch','wristlet')) return '👝';
-    return '👜';
+    if (has('backpack')) return 'backpack';
+    if (has('briefcase','laptop')) return 'briefcase';
+    if (has('suitcase','carry-on','carry on')) return 'suitcase';
+    if (has('duffel','gym bag')) return 'duffel';
+    if (has('clutch','wristlet')) return 'clutch';
+    if (has('tote','shopper')) return 'tote';
+    if (has('crossbody','cross-body')) return 'crossbody';
+    return 'handbag';
   }
-  if (categoryId === 'gloves') return has('boxing') ? '🥊' : '🧤';
-  if (categoryId === 'scarves') return '🧣';
-  if (categoryId === 'ties') return '👔';
-  if (categoryId === 'hair_accessories') return has('bow','ribbon') ? '🎀' : has('crown','tiara') ? '👑' : '✨';
-  if (categoryId === 'piercings') return '💎';
+  if (categoryId === 'gloves') return has('fingerless') ? 'fingerlessglove' : has('boxing') ? 'boxingglove' : has('mitten') ? 'mitten' : 'glove';
+  if (categoryId === 'scarves') return has('bandana') ? 'bandana' : has('shawl') ? 'shawl' : 'scarf';
+  if (categoryId === 'ties') return has('bow') ? 'bowtie' : 'tie';
+  if (categoryId === 'hair_accessories') return has('bow','ribbon') ? 'hairbow' : has('clip','barrette') ? 'hairclip' : has('headband') ? 'headband' : 'hairpin';
+  if (categoryId === 'piercings') return has('nose') ? 'nosepiercing' : has('brow') ? 'browpiercing' : has('lip') ? 'lippiercing' : 'piercing';
   if (categoryId === 'other_accessories') {
-    if (has('phone')) return '📱';
-    if (has('badge','id','pass')) return '🪪';
-    if (has('wallet','card holder')) return '👛';
-    if (has('key')) return '🔑';
-    if (has('umbrella')) return '☂️';
-    if (has('cane','walking stick','crutch')) return '🦯';
-    if (has('mask')) return '😷';
-    if (has('earbud','headphone','headset')) return '🎧';
-    if (has('stethoscope')) return '🩺';
-    if (has('camera')) return '📷';
-    if (has('binocular')) return '🔭';
-    if (has('bead','rosary')) return '📿';
-    if (has('fan')) return '🪭';
-    if (has('lighter')) return '🔥';
-    return '✨';
+    if (has('phone')) return 'phone';
+    if (has('wallet','card holder')) return 'wallet';
+    if (has('key')) return 'keys';
+    if (has('umbrella')) return 'umbrella';
+    if (has('mask')) return 'mask';
+    if (has('headphone','earbud','headset')) return 'headphones';
+    if (has('stethoscope')) return 'stethoscope';
+    if (has('camera')) return 'camera';
+    return 'accessory';
   }
-  return '•';
+  return 'accessory';
+}
+
+function vectorIcon(kind) {
+  const common = 'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+  const icons = {
+    briefs:`<path ${common} d="M7 8h18l-2 8c-1 5-5 8-7 8s-6-3-7-8L7 8Z"/><path ${common} d="M9 12c3 1 5 3 7 6 2-3 4-5 7-6"/>`,
+    bikinibrief:`<path ${common} d="M6 11h20l-4 9c-2 3-10 3-12 0l-4-9Z"/><path ${common} d="M8 12l5 5m11-5-5 5"/>`,
+    highbrief:`<path ${common} d="M8 5h16v11c0 5-4 8-8 8s-8-3-8-8V5Z"/><path ${common} d="M9 10h14M10 16c3 0 5 2 6 5 1-3 3-5 6-5"/>`,
+    cheeky:`<path ${common} d="M7 11h18l-3 8c-2 4-10 4-12 0l-3-8Z"/><path ${common} d="M10 17c4-2 8-2 12 0"/>`,
+    thong:`<path ${common} d="M7 9h18l-5 6-4 11-4-11-5-6Z"/><path ${common} d="M16 15v11"/>`,
+    gstring:`<path ${common} d="M6 9h20M7 9l8 6 1 11 1-11 8-6"/><path ${common} d="M14 13h4l-2 4-2-4Z"/>`,
+    boxers:`<path ${common} d="M7 7h18l1 16-9-1-1-8-1 8-9 1L7 7Z"/><path ${common} d="M7 11h18M16 11v4"/>`,
+    boxerbriefs:`<path ${common} d="M7 7h18v15l-8 1-1-9-1 9-8-1V7Z"/><path ${common} d="M7 11h18M16 11v3"/>`,
+    trunks:`<path ${common} d="M7 8h18v11l-8 1-1-6-1 6-8-1V8Z"/><path ${common} d="M7 11h18"/>`,
+    boyshort:`<path ${common} d="M6 9h20v11l-9 1-1-6-1 6-9-1V9Z"/><path ${common} d="M6 13h20"/>`,
+    jockstrap:`<path ${common} d="M7 8h18v5c-2 4-5 6-9 6s-7-2-9-6V8Z"/><path ${common} d="M10 17l-2 8m14-8 2 8m-10-6 2 6 2-6"/>`,
+    sportbrief:`<path ${common} d="M7 8h18l-2 9c-1 4-4 7-7 7s-6-3-7-7L7 8Z"/><path ${common} d="M11 8l2 14m8-14-2 14"/>`,
+    longjohn:`<path ${common} d="M8 6h16v8l-3 13h-5l-1-12-1 12H9L6 14 8 6Z"/><path ${common} d="M8 10h16"/>`,
+    bra:`<path ${common} d="M6 13c3-4 7-5 10 0 3-5 7-4 10 0v7H6v-7Z"/><path ${common} d="M16 13v7M8 13V7m16 6V7"/>`,
+    sportsbra:`<path ${common} d="M9 6h4l3 5 3-5h4l3 17H6L9 6Z"/><path ${common} d="M9 16h14"/>`,
+    straplessbra:`<path ${common} d="M6 12c3-3 7-3 10 1 3-4 7-4 10-1v8H6v-8Z"/><path ${common} d="M16 13v7"/>`,
+    bralette:`<path ${common} d="M8 7l4 2 4 6 4-6 4-2 2 16H6L8 7Z"/><path ${common} d="M12 9l4 6 4-6"/>`,
+    plungebra:`<path ${common} d="M6 12c4-4 7-3 10 3 3-6 6-7 10-3v8H6v-8Z"/><path ${common} d="M16 15v5M8 11V6m16 5V6"/>`,
+    corset:`<path ${common} d="M10 5h12l2 20-8 3-8-3 2-20Z"/><path ${common} d="M16 7v18M11 10h10m-10 4h10m-10 4h10"/>`,
+    tshirt:`<path ${common} d="M10 7l6-2 6 2 5 5-4 4-3-2v13H12V14l-3 2-4-4 5-5Z"/>`,
+    shirt:`<path ${common} d="M11 6l5 3 5-3 5 5-4 4-2-2v14H12V13l-2 2-4-4 5-5Z"/><path ${common} d="M16 9v18m0-14 3-4m-3 4-3-4"/>`,
+    tank:`<path ${common} d="M11 5h3v5h4V5h3l3 22H8l3-22Z"/><path ${common} d="M14 10h4"/>`,
+    croptop:`<path ${common} d="M10 7l6-2 6 2 4 5-4 4-2-2v7H12v-7l-2 2-4-4 4-5Z"/><path ${common} d="M12 18h8"/>`,
+    tubetop:`<path ${common} d="M8 10h16v12H8V10Z"/><path ${common} d="M8 13h16"/>`,
+    hoodie:`<path ${common} d="M12 8c0-4 8-4 8 0l4 3 3 13-6 2-2-10v11h-6V16l-2 10-6-2 3-13 4-3Z"/><path ${common} d="M13 9c2 2 4 2 6 0"/>`,
+    sweater:`<path ${common} d="M11 7h10l5 5-3 4-3-2v13H12V14l-3 2-3-4 5-5Z"/><path ${common} d="M12 22h8"/>`,
+    polo:`<path ${common} d="M10 7l6-2 6 2 5 5-4 4-3-2v13H12V14l-3 2-4-4 5-5Z"/><path ${common} d="M13 7l3 4 3-4M16 11v5"/>`,
+    jersey:`<path ${common} d="M10 7l6-2 6 2 5 5-4 4-3-2v13H12V14l-3 2-4-4 5-5Z"/><path ${common} d="M14 13h4m-2-2v8"/>`,
+    pants:`<path ${common} d="M10 5h12l2 22h-6l-2-13-2 13H8l2-22Z"/><path ${common} d="M10 10h12"/>`,
+    jeans:`<path ${common} d="M10 5h12l2 22h-6l-2-13-2 13H8l2-22Z"/><path ${common} d="M10 10h12m-10 0 3 4m5-4-3 4M11 7h2m6 0h2"/>`,
+    trousers:`<path ${common} d="M10 5h12l2 22h-6l-2-14-2 14H8l2-22Z"/><path ${common} d="M16 5v8m-5-4h10"/>`,
+    cargopants:`<path ${common} d="M10 5h12l2 22h-6l-2-13-2 13H8l2-22Z"/><rect ${common} x="8" y="14" width="5" height="5" rx="1"/><rect ${common} x="19" y="14" width="5" height="5" rx="1"/>`,
+    joggers:`<path ${common} d="M10 5h12l2 20-5 2-3-13-3 13-5-2 2-20Z"/><path ${common} d="M11 7c3 2 7 2 10 0M9 24h5m4 0h5"/>`,
+    leggings:`<path ${common} d="M11 5h10l2 22h-5l-2-15-2 15H9l2-22Z"/><path ${common} d="M11 9h10"/>`,
+    flarepants:`<path ${common} d="M11 5h10l1 11 5 11h-9l-2-14-2 14H5l5-11 1-11Z"/><path ${common} d="M11 9h10"/>`,
+    shorts:`<path ${common} d="M8 7h16l2 12-8 2-2-8-2 8-8-2L8 7Z"/><path ${common} d="M8 11h16"/>`,
+    skirt:`<path ${common} d="M11 7h10l5 19H6l5-19Z"/><path ${common} d="M11 11h10"/>`,
+    miniskirt:`<path ${common} d="M10 8h12l3 11H7l3-11Z"/><path ${common} d="M10 11h12"/>`,
+    pleatedskirt:`<path ${common} d="M10 7h12l4 19H6l4-19Z"/><path ${common} d="M10 11h12m-8 1-2 14m6-14 2 14m2-14 3 14"/>`,
+    pencilskirt:`<path ${common} d="M11 7h10l2 19H9l2-19Z"/><path ${common} d="M11 11h10"/>`,
+    maxiskirt:`<path ${common} d="M12 5h8l7 23H5l7-23Z"/><path ${common} d="M12 9h8"/>`,
+    dress:`<path ${common} d="M12 5l4 5 4-5 3 2-2 9 6 12H5l6-12-2-9 3-2Z"/><path ${common} d="M11 16h10"/>`,
+    jumpsuit:`<path ${common} d="M11 5h10l3 9-4 2 3 12h-6l-1-11-1 11H9l3-12-4-2 3-9Z"/>`,
+    romper:`<path ${common} d="M11 5h10l3 9-4 2 2 8-6 1-1-7-1 7-6-1 2-8-4-2 3-9Z"/>`,
+    bodysuit:`<path ${common} d="M11 5h10l3 10-5 3-3 10-3-10-5-3 3-10Z"/>`,
+    overalls:`<path ${common} d="M11 5h3v5h4V5h3l2 23h-6l-1-12-1 12H9l2-23Z"/><rect ${common} x="12" y="9" width="8" height="7" rx="1"/>`,
+    robe:`<path ${common} d="M11 5h10l5 7-4 3-2-3v16H12V12l-2 3-4-3 5-7Z"/><path ${common} d="M11 17h10m-5-8v19"/>`,
+    coat:`<path ${common} d="M11 5h10l5 7-4 3-2-3v16H12V12l-2 3-4-3 5-7Z"/><path ${common} d="M16 5v23m-3-14h6"/>`,
+    blazer:`<path ${common} d="M11 5h10l4 7-4 2-2-3v17H13V11l-2 3-4-2 4-7Z"/><path ${common} d="M11 6l5 8 5-8m-5 8v14"/>`,
+    vest:`<path ${common} d="M11 5h4l1 5 1-5h4l3 23H8l3-23Z"/><path ${common} d="M16 10v18"/>`,
+    cape:`<path ${common} d="M12 5h8l7 23H5l7-23Z"/><path ${common} d="M12 8c2 2 6 2 8 0"/>`,
+    raincoat:`<path ${common} d="M12 7c0-4 8-4 8 0l5 5-4 3-2-3v16h-6V12l-2 3-4-3 5-5Z"/><path ${common} d="M12 8h8"/>`,
+    puffer:`<path ${common} d="M11 5h10l5 7-4 3-2-3v16H12V12l-2 3-4-3 5-7Z"/><path ${common} d="M12 11h8m-8 5h8m-8 5h8"/>`,
+    pajamas:`<path ${common} d="M9 7l7-2 7 2 3 6-4 2-2-4v7l3 10h-6l-1-9-1 9H9l3-10v-7l-2 4-4-2 3-6Z"/>`,
+    pajamashorts:`<path ${common} d="M9 7l7-2 7 2 3 6-4 2-2-4v5H12v-5l-2 4-4-2 3-6Z"/><path ${common} d="M10 19h12l2 8-7 1-1-6-1 6-7-1 2-8Z"/>`,
+    nightgown:`<path ${common} d="M12 5l4 5 4-5 3 2-2 8 6 13H5l6-13-2-8 3-2Z"/>`,
+    bikinitop:`<path ${common} d="M7 16c2-7 7-7 9 0 2-7 7-7 9 0l-2 5H9l-2-5Z"/><path ${common} d="M16 16v5M10 14l-2-7m14 7 2-7"/>`,
+    trianglebikini:`<path ${common} d="M7 20l7-10 2 10H7Zm18 0-7-10-2 10h9Z"/><path ${common} d="M14 10l2-5 2 5M7 20h18"/>`,
+    swimshorts:`<path ${common} d="M8 7h16l2 14-8 2-2-9-2 9-8-2L8 7Z"/><path ${common} d="M11 10c3 2 7 2 10 0"/>`,
+    noshow:`<path ${common} d="M8 20c5 1 8 0 12-5l6 4c-3 5-8 7-18 5v-4Z"/>`,
+    anklesock:`<path ${common} d="M10 11h8v7l8 3c-2 5-8 6-16 3V11Z"/><path ${common} d="M10 15h8"/>`,
+    crewsock:`<path ${common} d="M10 7h8v11l8 3c-2 5-8 6-16 3V7Z"/><path ${common} d="M10 11h8"/>`,
+    kneesock:`<path ${common} d="M10 4h8v14l8 3c-2 5-8 6-16 3V4Z"/><path ${common} d="M10 8h8"/>`,
+    thighsock:`<path ${common} d="M10 2h8v16l8 3c-2 5-8 6-16 3V2Z"/><path ${common} d="M10 6h8"/>`,
+    stockings:`<path ${common} d="M7 4h7v20l-2 5H8L7 24V4Zm11 0h7v20l-1 5h-4l-2-5V4Z"/><path ${common} d="M7 8h7m4 0h7"/>`,
+    fishnet:`<path ${common} d="M7 4h7v20l-2 5H8L7 24V4Zm11 0h7v20l-1 5h-4l-2-5V4Z"/><path ${common} d="M7 8h7m4 0h7M8 11l6 6m-6 1 6 6m11-13-7 7m7 0-6 6M8 7l6 6m11-6-7 7"/>`,
+    thighstockings:`<path ${common} d="M7 2h7v22l-2 5H8L7 24V2Zm11 0h7v22l-1 5h-4l-2-5V2Z"/><path ${common} d="M7 6h7m4 0h7"/>`,
+    kneestockings:`<path ${common} d="M7 9h7v15l-2 5H8L7 24V9Zm11 0h7v15l-1 5h-4l-2-5V9Z"/><path ${common} d="M7 13h7m4 0h7"/>`,
+    garterstockings:`<path ${common} d="M8 4h16l-2 6H10L8 4Zm2 6v5m12-5v5M7 14h7v10l-2 5H8L7 24V14Zm11 0h7v10l-1 5h-4l-2-5V14Z"/>`,
+    tights:`<path ${common} d="M9 3h14l-2 26h-5l-1-15-1 15H9L9 3Z"/><path ${common} d="M9 8h14"/>`,
+    sneaker:`<path ${common} d="M7 18c5 0 7-4 9-8l4 7 6 3v5H7v-7Z"/><path ${common} d="M8 21h18m-9-7 5 2"/>`,
+    dressshoe:`<path ${common} d="M7 18c6 0 8-3 10-7l3 6 6 3v5H7v-7Z"/><path ${common} d="M7 22h19M17 15h5"/>`,
+    heel:`<path ${common} d="M7 18c6 0 8-4 10-9l4 8 5 3v4H7v-6Z"/><path ${common} d="M22 24v5m-14-5h14"/>`,
+    boot:`<path ${common} d="M10 4h10v14l6 3v5H10V4Z"/><path ${common} d="M10 20h16m-13-4h7"/>`,
+    ankleboot:`<path ${common} d="M10 10h10v8l6 3v5H10V10Z"/><path ${common} d="M10 21h16"/>`,
+    sandal:`<path ${common} d="M7 22h19v4H7v-4Zm4 0c0-6 5-9 10-10m-8 3 8 7"/>`,
+    slides:`<path ${common} d="M7 22h19v4H7v-4Zm4 0 2-7h10l2 7"/>`,
+    slipper:`<path ${common} d="M7 20c5 0 8-2 11-6l8 5v6H7v-5Z"/><path ${common} d="M11 20c4 2 8 2 12 0"/>`,
+    barefoot:`<path ${common} d="M12 26c-4-4-4-10-2-15 1-3 4-5 6-2l1 5 2-8c1-3 4-2 4 1l-1 8 3-5c2-2 4 0 3 3l-4 9c-2 5-8 7-12 4Z"/><circle ${common} cx="9" cy="7" r="1"/><circle ${common} cx="12" cy="5" r="1"/>`,
+    cap:`<path ${common} d="M8 17c0-7 16-7 16 0H8Z"/><path ${common} d="M16 17c5 0 9 1 12 4-5 1-9 0-12-4Z"/>`,
+    beanie:`<path ${common} d="M9 19c0-10 14-10 14 0H9Z"/><path ${common} d="M8 19h16v5H8v-5Z"/><path ${common} d="M16 7V4"/>`,
+    sunhat:`<path ${common} d="M10 17c1-10 11-10 12 0H10Z"/><path ${common} d="M4 18c6-3 18-3 24 0-5 5-19 5-24 0Z"/>`,
+    cowboyhat:`<path ${common} d="M10 17l3-10h6l3 10H10Z"/><path ${common} d="M4 18c6 2 18 2 24 0-3 6-21 6-24 0Z"/>`,
+    helmet:`<path ${common} d="M7 17C7 7 25 7 25 17v4H7v-4Z"/><path ${common} d="M16 8v13m0 0h8"/>`,
+    crown:`<path ${common} d="M6 10l6 5 4-8 4 8 6-5-3 14H9L6 10Z"/><path ${common} d="M9 20h14"/>`,
+    hat:`<path ${common} d="M10 16l2-9h8l2 9H10Z"/><path ${common} d="M5 18h22"/>`,
+    glasses:`<circle ${common} cx="11" cy="16" r="5"/><circle ${common} cx="21" cy="16" r="5"/><path ${common} d="M16 16h0m-10-1-3-2m23 2 3-2"/>`,
+    sunglasses:`<path ${common} d="M5 12h10l-1 8H8l-3-8Zm12 0h10l-3 8h-6l-1-8Z"/><path ${common} d="M15 14h2M5 12l-2-2m24 2 2-2"/>`,
+    goggles:`<rect ${common} x="4" y="11" width="10" height="9" rx="4"/><rect ${common} x="18" y="11" width="10" height="9" rx="4"/><path ${common} d="M14 15h4M4 14l-2-2m26 2 2-2"/>`,
+    monocle:`<circle ${common} cx="14" cy="14" r="7"/><path ${common} d="M19 19l5 9"/>`,
+    locket:`<path ${common} d="M7 5c2 14 16 14 18 0"/><path ${common} d="M13 17c0-4 6-4 6 0 0 4-3 6-3 6s-3-2-3-6Z"/>`,
+    pearlnecklace:`<path ${common} d="M6 6c2 17 18 17 20 0"/><circle ${common} cx="8" cy="10" r="1"/><circle ${common} cx="11" cy="15" r="1"/><circle ${common} cx="16" cy="18" r="1"/><circle ${common} cx="21" cy="15" r="1"/><circle ${common} cx="24" cy="10" r="1"/>`,
+    choker:`<path ${common} d="M7 13c5 3 13 3 18 0"/><path ${common} d="M8 16c5 2 11 2 16 0"/>`,
+    velvetchoker:`<path ${common} d="M7 12c5 4 13 4 18 0l-1 5c-5 3-11 3-16 0l-1-5Z"/>`,
+    chainchoker:`<path ${common} d="M6 14c2 4 18 4 20 0"/><ellipse ${common} cx="9" cy="16" rx="2" ry="1"/><ellipse ${common} cx="14" cy="17" rx="2" ry="1"/><ellipse ${common} cx="19" cy="17" rx="2" ry="1"/><ellipse ${common} cx="24" cy="16" rx="2" ry="1"/>`,
+    collarnecklace:`<path ${common} d="M7 9c3 12 15 12 18 0l-4 11H11L7 9Z"/>`,
+    statementnecklace:`<path ${common} d="M7 6c2 12 16 12 18 0"/><path ${common} d="M10 14l3 7 3-5 3 5 3-7"/>`,
+    layerednecklace:`<path ${common} d="M7 5c2 10 16 10 18 0M9 8c2 13 12 13 14 0M12 13c1 9 7 9 8 0"/>`,
+    cubanchain:`<path ${common} d="M6 8c1 12 19 12 20 0"/><g ${common}><ellipse cx="9" cy="13" rx="3" ry="2"/><ellipse cx="14" cy="17" rx="3" ry="2"/><ellipse cx="19" cy="17" rx="3" ry="2"/><ellipse cx="24" cy="13" rx="3" ry="2"/></g>`,
+    ropechain:`<path ${common} d="M7 6c2 16 16 16 18 0"/><path ${common} d="M9 10l3 2-2 3 4 2-1 3m10-10-3 2 2 3-4 2 1 3"/>`,
+    boxchain:`<path ${common} d="M7 6c2 16 16 16 18 0"/><rect ${common} x="8" y="10" width="3" height="3"/><rect ${common} x="11" y="15" width="3" height="3"/><rect ${common} x="15" y="18" width="3" height="3"/><rect ${common} x="19" y="15" width="3" height="3"/><rect ${common} x="22" y="10" width="3" height="3"/>`,
+    figarochain:`<path ${common} d="M7 6c2 16 16 16 18 0"/><ellipse ${common} cx="9" cy="11" rx="3" ry="1.5"/><ellipse ${common} cx="13" cy="16" rx="1.6" ry="1.1"/><ellipse ${common} cx="16" cy="18" rx="1.6" ry="1.1"/><ellipse ${common} cx="21" cy="15" rx="3" ry="1.5"/>`,
+    pendant:`<path ${common} d="M7 5c2 15 16 15 18 0"/><circle ${common} cx="16" cy="20" r="3"/>`,
+    crossnecklace:`<path ${common} d="M7 5c2 15 16 15 18 0"/><path ${common} d="M16 17v9m-4-6h8"/>`,
+    dogtag:`<path ${common} d="M7 5c2 14 16 14 18 0"/><path ${common} d="M13 17h6l2 2-2 7h-6l-2-7 2-2Z"/>`,
+    studearring:`<circle ${common} cx="16" cy="16" r="4"/><path ${common} d="M20 16h5"/>`,
+    hoopearring:`<circle ${common} cx="16" cy="16" r="8"/><path ${common} d="M16 8v4"/>`,
+    dangleearring:`<circle ${common} cx="16" cy="8" r="2"/><path ${common} d="M16 10v6"/><path ${common} d="M12 17l4 8 4-8-4-3-4 3Z"/>`,
+    earring:`<circle ${common} cx="16" cy="11" r="3"/><path ${common} d="M16 14v10"/><circle ${common} cx="16" cy="25" r="2"/>`,
+    chainbracelet:`<ellipse ${common} cx="16" cy="16" rx="10" ry="6"/><path ${common} d="M7 16h4m2-5 2 4m5-4-2 4m3 1h4"/>`,
+    cuffbracelet:`<path ${common} d="M8 10c-5 10 5 17 13 12 4-2 5-8 2-12"/><path ${common} d="M10 11c-2 6 3 11 8 8"/>`,
+    beadbracelet:`<circle ${common} cx="16" cy="16" r="9"/><circle ${common} cx="16" cy="7" r="1"/><circle ${common} cx="24" cy="12" r="1"/><circle ${common} cx="23" cy="20" r="1"/><circle ${common} cx="9" cy="20" r="1"/><circle ${common} cx="8" cy="12" r="1"/>`,
+    tennisbracelet:`<ellipse ${common} cx="16" cy="16" rx="10" ry="7"/><path ${common} d="M8 13l3 3-2 3m6-10 2 4m5-2-2 4m4 4-4 1"/>`,
+    ring:`<circle ${common} cx="16" cy="18" r="8"/><circle ${common} cx="16" cy="18" r="4"/>`,
+    bandring:`<circle ${common} cx="16" cy="17" r="9"/><circle ${common} cx="16" cy="17" r="6"/><path ${common} d="M9 13h14"/>`,
+    gemring:`<circle ${common} cx="16" cy="19" r="7"/><path ${common} d="M12 10l4-5 4 5-4 4-4-4Z"/>`,
+    signetring:`<circle ${common} cx="16" cy="19" r="7"/><rect ${common} x="11" y="6" width="10" height="8" rx="2"/>`,
+    watch:`<rect ${common} x="9" y="8" width="14" height="16" rx="4"/><path ${common} d="M12 8V3h8v5m-8 16v5h8v-5"/><circle ${common} cx="16" cy="16" r="4"/><path ${common} d="M16 13v3l2 2"/>`,
+    smartwatch:`<rect ${common} x="9" y="8" width="14" height="16" rx="4"/><path ${common} d="M12 8V3h8v5m-8 16v5h8v-5"/><path ${common} d="M13 14h6v4h-6z"/>`,
+    digitalwatch:`<rect ${common} x="9" y="8" width="14" height="16" rx="3"/><path ${common} d="M12 8V3h8v5m-8 16v5h8v-5"/><path ${common} d="M12 14h8v5h-8zM14 16h1m2 0h1"/>`,
+    pocketwatch:`<circle ${common} cx="16" cy="18" r="9"/><path ${common} d="M16 9V5h4m-4 9v5l3 2M10 4c8-4 14 1 16 6"/>`,
+    belt:`<path ${common} d="M5 13h22v7H5v-7Z"/><rect ${common} x="13" y="11" width="8" height="11" rx="1"/>`,
+    chainbelt:`<path ${common} d="M5 14c5 6 17 6 22 0"/><ellipse ${common} cx="9" cy="17" rx="2" ry="1"/><ellipse ${common} cx="14" cy="19" rx="2" ry="1"/><ellipse ${common} cx="19" cy="19" rx="2" ry="1"/><ellipse ${common} cx="24" cy="17" rx="2" ry="1"/>`,
+    suspenders:`<path ${common} d="M10 5l4 22m8-22-4 22M11 9h10M13 18h6"/>`,
+    backpack:`<path ${common} d="M10 9c0-6 12-6 12 0l4 5v13H6V14l4-5Z"/><path ${common} d="M10 15h12v9H10zM12 9h8"/>`,
+    briefcase:`<rect ${common} x="5" y="10" width="22" height="15" rx="2"/><path ${common} d="M12 10V6h8v4m-15 7h22m-13 0v3h4v-3"/>`,
+    suitcase:`<rect ${common} x="8" y="7" width="16" height="20" rx="3"/><path ${common} d="M12 7V4h8v3m-8 20v2m8-2v2M16 7v20"/>`,
+    duffel:`<path ${common} d="M7 12h18l3 12H4l3-12Z"/><path ${common} d="M11 12c0-6 10-6 10 0m-5 0v12"/>`,
+    clutch:`<rect ${common} x="6" y="12" width="20" height="12" rx="3"/><path ${common} d="M6 16l10 5 10-5M22 12c0-4 4-4 5-1"/>`,
+    tote:`<path ${common} d="M7 11h18l2 16H5l2-16Z"/><path ${common} d="M11 11c0-7 10-7 10 0"/>`,
+    crossbody:`<path ${common} d="M4 4l24 24"/><rect ${common} x="9" y="13" width="14" height="11" rx="3"/>`,
+    handbag:`<path ${common} d="M7 12h18l2 14H5l2-14Z"/><path ${common} d="M11 12c0-7 10-7 10 0M10 17h12"/>`,
+    glove:`<path ${common} d="M10 27V13c0-2 3-2 3 0v-5c0-2 3-2 3 0v5-7c0-2 3-2 3 0v7-5c0-2 3-2 3 0v8l2-3c2-2 5 0 3 3l-6 10c-3 5-11 4-11 1Z"/>`,
+    fingerlessglove:`<path ${common} d="M10 27V15h3v-5h3v5h3v-5h3v6l3-2c2-1 4 1 3 3l-6 9c-3 4-9 4-12 1Z"/><path ${common} d="M10 20h12"/>`,
+    mitten:`<path ${common} d="M10 27V11c0-7 11-7 11 0v6l3-2c5-2 6 5 2 8l-5 4H10Z"/>`,
+    boxingglove:`<path ${common} d="M9 23c-3-7 1-16 8-17 6-1 10 5 8 10l-2 4 4 2-4 6H11l-2-5Z"/><path ${common} d="M11 23h12"/>`,
+    scarf:`<path ${common} d="M11 5h10v14H11V5Z"/><path ${common} d="M13 19l-3 10m9-10 3 10m-10-4h3m3 0h3"/>`,
+    bandana:`<path ${common} d="M6 8c5 5 15 5 20 0l-10 18L6 8Z"/><path ${common} d="M8 10l-4 5m20-5 4 5"/>`,
+    shawl:`<path ${common} d="M5 9c7 7 15 7 22 0l-5 17H10L5 9Z"/><path ${common} d="M12 26l-2 3m6-3v3m6-3 2 3"/>`,
+    tie:`<path ${common} d="M13 5h6l2 5-5 5-5-5 2-5Z"/><path ${common} d="M16 15l5 11-5 4-5-4 5-11Z"/>`,
+    bowtie:`<path ${common} d="M15 13 7 8v16l8-5h2l8 5V8l-8 5h-2Z"/><rect ${common} x="14" y="12" width="4" height="8" rx="1"/>`,
+    hairbow:`<path ${common} d="M15 13 7 8v14l8-4h2l8 4V8l-8 5h-2Z"/><circle ${common} cx="16" cy="16" r="2"/>`,
+    hairclip:`<path ${common} d="M7 12c6-4 12-4 18 0l-2 8c-5-3-9-3-14 0l-2-8Z"/><path ${common} d="M10 15h12"/>`,
+    headband:`<path ${common} d="M7 22c0-16 18-16 18 0"/><path ${common} d="M10 22c0-12 12-12 12 0"/>`,
+    hairpin:`<path ${common} d="M8 8l16 16m-9-16 9 9M8 15l9 9"/>`,
+    nosepiercing:`<path ${common} d="M12 7c7 0 10 6 8 11-1 3-4 5-8 4"/><circle ${common} cx="21" cy="17" r="2"/>`,
+    browpiercing:`<path ${common} d="M7 15c6-5 12-5 18 0"/><circle ${common} cx="10" cy="12" r="2"/><circle ${common} cx="22" cy="12" r="2"/>`,
+    lippiercing:`<path ${common} d="M8 17c5-4 11-4 16 0-5 5-11 5-16 0Z"/><circle ${common} cx="21" cy="21" r="2"/>`,
+    piercing:`<circle ${common} cx="16" cy="16" r="8"/><circle ${common} cx="23" cy="10" r="2"/>`,
+    phone:`<rect ${common} x="10" y="3" width="12" height="26" rx="3"/><path ${common} d="M14 6h4m-3 20h2"/>`,
+    wallet:`<rect ${common} x="5" y="9" width="22" height="15" rx="3"/><path ${common} d="M18 13h9v7h-9c-4 0-4-7 0-7Z"/>`,
+    keys:`<circle ${common} cx="11" cy="12" r="5"/><path ${common} d="M15 15l12 12m-5-5 3-3m-7-1 3-3"/>`,
+    umbrella:`<path ${common} d="M4 15c4-12 20-12 24 0H4Z"/><path ${common} d="M16 15v10c0 5 7 5 7 0"/>`,
+    mask:`<path ${common} d="M6 11c7 3 13 3 20 0v11c-6 6-14 6-20 0V11Z"/><path ${common} d="M6 14 2 11m24 3 4-3m-20 6h12"/>`,
+    headphones:`<path ${common} d="M6 17C6 4 26 4 26 17"/><rect ${common} x="4" y="16" width="6" height="10" rx="2"/><rect ${common} x="22" y="16" width="6" height="10" rx="2"/>`,
+    stethoscope:`<path ${common} d="M9 4v8c0 8 14 8 14 0V4m-17 0h6m8 0h6M16 20v4c0 5 8 5 8 0"/><circle ${common} cx="24" cy="24" r="3"/>`,
+    camera:`<rect ${common} x="4" y="9" width="24" height="17" rx="3"/><circle ${common} cx="16" cy="18" r="5"/><path ${common} d="M10 9l2-4h8l2 4"/>`,
+    accessory:`<circle ${common} cx="16" cy="16" r="8"/><path ${common} d="M16 7v18M7 16h18"/>`,
+  };
+  return icons[kind] || icons.accessory;
 }
 
 function itemGlyphHtml(categoryId, item) {
-  return `<span class="ghw-item-glyph" aria-hidden="true">${esc(itemGlyph(categoryId,item))}</span>`;
+  const kind = iconKind(categoryId, item);
+  return `<span class="ghw-item-glyph ghw-icon-${esc(kind)}" aria-hidden="true"><svg viewBox="0 0 32 32" focusable="false">${vectorIcon(kind)}</svg></span>`;
 }
 
 function itemGrid() {
