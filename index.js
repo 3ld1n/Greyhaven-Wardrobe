@@ -1,7 +1,7 @@
 import { COLORS, CATALOG } from './catalog.js';
 
 const GHW_MODULE = 'greyhaven-wardrobe';
-const GHW_VERSION = '1.0.0';
+const GHW_VERSION = '1.1.0';
 const META_KEY = 'greyhavenWardrobe';
 const PROMPT_KEY = 'greyhaven_wardrobe_state';
 const PROMPT_POSITION = 1;
@@ -160,13 +160,17 @@ function currentRelevantPeople() {
   return people.filter(person => wanted.has(person.key));
 }
 
-function emptyOutfit(mode = 'unknown') {
-  return { mode, items: {}, updatedAt: Date.now() };
+function emptyOutfit(mode = 'unknown', coverage = 'complete') {
+  return { mode, coverage, knownAbsent: [], items: {}, updatedAt: Date.now() };
 }
 
 function normalizeOutfit(input) {
   const safe = input && typeof input === 'object' ? clone(input) : emptyOutfit();
   safe.mode = ['unknown','set','naked'].includes(safe.mode) ? safe.mode : 'unknown';
+  safe.coverage = ['complete','partial'].includes(safe.coverage) ? safe.coverage : 'complete';
+  safe.knownAbsent = Array.isArray(safe.knownAbsent)
+    ? [...new Set(safe.knownAbsent.map(norm).filter(id => CATALOG[id]))]
+    : [];
   if (!safe.items || typeof safe.items !== 'object' || Array.isArray(safe.items)) safe.items = {};
 
   for (const [categoryId, category] of Object.entries(CATALOG)) {
@@ -194,7 +198,17 @@ function saveOutfit(personKey, outfit) {
   if (!s || !personKey) return;
   const normalized = normalizeOutfit(outfit);
   const selectedCount = Object.values(normalized.items).reduce((sum, rows) => sum + rows.length, 0);
-  if (normalized.mode !== 'unknown') normalized.mode = selectedCount ? 'set' : 'naked';
+  if (normalized.mode !== 'unknown') {
+    if (normalized.mode === 'naked') {
+      normalized.coverage = 'complete';
+      normalized.knownAbsent = [];
+    } else if (normalized.coverage === 'partial') {
+      normalized.mode = (selectedCount || normalized.knownAbsent.length) ? 'set' : 'unknown';
+    } else {
+      normalized.mode = selectedCount ? 'set' : 'naked';
+      normalized.knownAbsent = [];
+    }
+  }
   normalized.updatedAt = Date.now();
   s.outfits[personKey] = normalized;
   persist(s);
@@ -216,24 +230,106 @@ function describeItem(categoryId, entry) {
   return entry.color ? `${entry.color} ${label}` : label;
 }
 
+function selectedIn(outfit, categoryId) {
+  return Array.isArray(outfit?.items?.[categoryId]) && outfit.items[categoryId].length > 0;
+}
+
+function explicitlyAbsent(outfit, categoryId) {
+  if (!outfit || outfit.mode === 'unknown') return false;
+  if (outfit.mode === 'naked') return true;
+  if (outfit.coverage === 'partial') return (outfit.knownAbsent || []).includes(categoryId);
+  return !selectedIn(outfit, categoryId);
+}
+
+function selectedLabelContains(outfit, categoryId, token) {
+  return (outfit?.items?.[categoryId] || []).some(row => lc(itemLabel(categoryId, row.id)).includes(lc(token)));
+}
+
+function wardrobeAwareness(person, outfit) {
+  if (!person || !outfit || outfit.mode === 'unknown') return [];
+
+  const notes = [];
+  if (outfit.mode === 'naked') {
+    notes.push(`${person.name} personally knows they are completely naked.`);
+    notes.push(`Their lack of clothing is a major visible fact unless the newest roleplay establishes concealment such as a blanket or towel.`);
+    return notes;
+  }
+
+  const noBra = explicitlyAbsent(outfit, 'bra');
+  const noUnderwear = explicitlyAbsent(outfit, 'underwear');
+  const noTop = explicitlyAbsent(outfit, 'top');
+  const noBottom = explicitlyAbsent(outfit, 'bottom');
+  const noOnepiece = explicitlyAbsent(outfit, 'onepiece');
+  const noOuterwear = explicitlyAbsent(outfit, 'outerwear');
+  const noSwimTop = explicitlyAbsent(outfit, 'swim_top');
+  const noSwimBottom = explicitlyAbsent(outfit, 'swim_bottom');
+  const noSleepwear = explicitlyAbsent(outfit, 'sleepwear');
+  const noSocks = explicitlyAbsent(outfit, 'socks');
+  const noHosiery = explicitlyAbsent(outfit, 'hosiery');
+  const noFootwear = explicitlyAbsent(outfit, 'footwear') || selectedLabelContains(outfit, 'footwear', 'barefoot');
+
+  const upperCover = selectedIn(outfit,'top') || selectedIn(outfit,'onepiece') || selectedIn(outfit,'outerwear') ||
+    selectedIn(outfit,'swim_top') || selectedIn(outfit,'sleepwear') || selectedIn(outfit,'bra');
+  const lowerCover = selectedIn(outfit,'bottom') || selectedIn(outfit,'onepiece') || selectedIn(outfit,'swim_bottom') ||
+    selectedIn(outfit,'sleepwear') || selectedIn(outfit,'underwear');
+
+  const selfMissing = [];
+  if (noBra) selfMissing.push('no bra');
+  if (noUnderwear) selfMissing.push('no underwear');
+  if (noTop) selfMissing.push('no top');
+  if (noBottom) selfMissing.push('no bottom');
+  if (noSocks && noHosiery) selfMissing.push('no socks/hosiery');
+  if (noFootwear) selfMissing.push('no footwear');
+  if (selfMissing.length) notes.push(`${person.name} is personally aware of these absences: ${selfMissing.join(', ')}.`);
+
+  if (!upperCover && noTop && noBra && noOnepiece && noOuterwear && noSwimTop && noSleepwear) {
+    notes.push(`${person.name}'s upper body has no garment covering it; this is visibly exposed and should not be silently treated as ordinary clothing.`);
+  }
+  if (!lowerCover && noBottom && noUnderwear && noOnepiece && noSwimBottom && noSleepwear) {
+    notes.push(`${person.name} has no lower-body garment or underwear; this is a major state the wearer is aware of, with visibility depending on any longer upper garment or other established cover.`);
+  }
+  if (noFootwear) {
+    notes.push(`${person.name} is barefoot / without footwear.`);
+  } else if (noSocks && noHosiery) {
+    notes.push(`${person.name} is wearing no socks or hosiery; the wearer knows this, while others only know it when the footwear/legs make it visible.`);
+  }
+
+  if (noUnderwear && upperCover) {
+    notes.push(`No-underwear status is private self-knowledge unless the clothing/pose or roleplay makes it visible or tells another character.`);
+  }
+  if (noBra && upperCover && !(noTop && !upperCover)) {
+    notes.push(`No-bra status is self-knowledge; other characters should only know it from visible evidence or explicit roleplay.`);
+  }
+
+  return notes;
+}
+
 function describeOutfit(person, outfit) {
   if (!person || !outfit || outfit.mode === 'unknown') return '';
-  if (outfit.mode === 'naked') return `${person.name}: explicitly naked; wearing no clothing, underwear, footwear, or accessories.`;
+  if (outfit.mode === 'naked') {
+    return `${person.name}: explicitly naked; wearing no clothing, underwear, socks/hosiery, footwear, or accessories. ${wardrobeAwareness(person,outfit).join(' ')}`;
+  }
 
   const worn = [];
   for (const [categoryId, category] of Object.entries(CATALOG)) {
     for (const entry of outfit.items[categoryId] || []) {
-      worn.push(`${category.label}: ${describeItem(categoryId, entry)}`);
+      const label = describeItem(categoryId, entry);
+      if (categoryId === 'footwear' && lc(label).includes('barefoot')) worn.push(`Footwear state: barefoot`);
+      else worn.push(`${category.label}: ${label}`);
     }
   }
 
-  const absent = PRIMARY_ABSENCE_CATEGORIES
-    .filter(categoryId => !(outfit.items[categoryId] || []).length)
-    .map(categoryId => CATALOG[categoryId]?.label)
-    .filter(Boolean);
+  const absent = outfit.coverage === 'partial'
+    ? (outfit.knownAbsent || []).map(categoryId => CATALOG[categoryId]?.label).filter(Boolean)
+    : PRIMARY_ABSENCE_CATEGORIES
+        .filter(categoryId => !(outfit.items[categoryId] || []).length)
+        .map(categoryId => CATALOG[categoryId]?.label)
+        .filter(Boolean);
 
   const pieces = [`${person.name}: wearing ${worn.length ? worn.join('; ') : 'no selected garments'}.`];
-  if (absent.length) pieces.push(`Explicitly not wearing: ${absent.join(', ')}.`);
+  if (absent.length) pieces.push(`Explicitly not wearing / known absent: ${absent.join(', ')}.`);
+  const awareness = wardrobeAwareness(person, outfit);
+  if (awareness.length) pieces.push(`Awareness: ${awareness.join(' ')}`);
   return pieces.join(' ');
 }
 
@@ -247,11 +343,14 @@ function buildPrompt() {
   }
   if (!rows.length) return '';
   return [
-    '[Greyhaven Wardrobe — authoritative visible outfit state for the current scene. Use silently for continuity; do not quote this block as metadata.]',
-    'Outfit rule: listed clothing is factual current appearance. Omitted primary garment categories are explicitly absent for an outfit that has been saved. “Naked” means no clothing at all. “Unknown” people are omitted and must not be assumed naked.',
-    'Perception rule: current scene participants may naturally perceive each other’s visible listed clothing. Do not invent extra garments that contradict this state. Newer explicit roleplay can change clothing and should override stale wardrobe state until the user updates/detects it.',
+    '[Greyhaven Wardrobe — authoritative current outfit state. Use silently for continuity; do not quote this block as metadata.]',
+    'Outfit rule: listed clothing is factual. For a manually saved complete outfit, omitted primary garment categories are explicitly absent. A detected partial outfit only treats specifically detected absences as absent. “Naked” means no clothing at all. “Unknown” people are omitted and must not be assumed naked.',
+    'Self-awareness rule: each wearer knows what they are wearing AND what major garments they are not wearing, especially bra/underwear, top, bottom, socks/hosiery and footwear.',
+    'Salience rule: visible major absences such as a bare upper body, no lower garment, or being barefoot are meaningful physical facts. When socially relevant, characters should naturally register them in attention, body language, dialogue or practical behavior without waiting for the user to ask “what about the top?”. Do not force a reaction every message and do not make it melodramatic; home, beach, bedroom, work and public settings can make the same outfit feel very different.',
+    'Privacy rule: hidden absences such as no underwear, no bra under opaque clothing, or no socks inside closed shoes are known to the wearer but are NOT automatically known by other characters unless visible or explicitly established in roleplay.',
+    'Perception rule: scene participants may naturally perceive each other’s visible clothing and visible absences. Do not invent extra garments that contradict this state. Newer explicit roleplay can change clothing and overrides stale wardrobe state until the user updates/detects it.',
     ...rows,
-  ].join('\n');
+  ].join('\\n');
 }
 
 function updatePrompt() {
@@ -332,12 +431,113 @@ function categoryButtons() {
   }).join('');
 }
 
+
+function itemGlyph(categoryId, item) {
+  const text = lc(`${item?.id || ''} ${item?.label || ''}`);
+
+  const has = (...words) => words.some(word => text.includes(word));
+  if (categoryId === 'bra') return has('sports') ? '🎽' : has('corset','bustier','longline') ? '🎀' : '👙';
+  if (categoryId === 'underwear') return has('boxer','short','long john','thermal') ? '🩳' : '🩲';
+  if (categoryId === 'top') {
+    if (has('lab coat','chef jacket','scrub')) return '🥼';
+    if (has('hoodie','sweater','cardigan','sweatshirt','jacket')) return '🧥';
+    if (has('tank','jersey','running','sports','compression')) return '🎽';
+    if (has('blouse','camisole','halter','crop','tube','peplum')) return '👚';
+    if (has('corset','bustier','bodice')) return '🎀';
+    return '👕';
+  }
+  if (categoryId === 'bottom') {
+    if (has('short')) return '🩳';
+    if (has('skirt','sarong','kilt')) return '👗';
+    return '👖';
+  }
+  if (categoryId === 'onepiece') {
+    if (has('jumpsuit','romper','bodysuit','leotard','unitard')) return '🩱';
+    if (has('overall')) return '👖';
+    if (has('robe','kimono','kaftan')) return '🥻';
+    return '👗';
+  }
+  if (categoryId === 'outerwear') {
+    if (has('blazer','suit')) return '🤵';
+    if (has('rain','poncho')) return '🌧️';
+    if (has('cardigan','shawl')) return '🧶';
+    return '🧥';
+  }
+  if (categoryId === 'sleepwear') return has('robe') ? '🧖' : has('nightgown','slip') ? '👗' : '🌙';
+  if (categoryId === 'swim_top') return '👙';
+  if (categoryId === 'swim_bottom') return has('short','trunk','board') ? '🩳' : '👙';
+  if (categoryId === 'socks' || categoryId === 'hosiery') return '🧦';
+  if (categoryId === 'footwear') {
+    if (has('barefoot')) return '🦶';
+    if (has('flip-flop','slides')) return '🩴';
+    if (has('sandal')) return '👡';
+    if (has('slipper','flat','loafer','ballet')) return '🥿';
+    if (has('heel','pump','stiletto','platform')) return '👠';
+    if (has('boot')) return '👢';
+    if (has('oxford','derby','dress shoe','monk')) return '👞';
+    if (has('skate')) return '⛸️';
+    if (has('ski')) return '🎿';
+    return '👟';
+  }
+  if (categoryId === 'headwear') {
+    if (has('cap')) return '🧢';
+    if (has('crown','tiara')) return '👑';
+    if (has('cowboy')) return '🤠';
+    if (has('sun hat','straw','floppy')) return '👒';
+    if (has('helmet','hard hat')) return '⛑️';
+    if (has('beanie')) return '🧶';
+    return '🎩';
+  }
+  if (categoryId === 'eyewear') return has('sun') ? '🕶️' : has('goggle') ? '🥽' : '👓';
+  if (categoryId === 'earrings') return has('pearl') ? '⚪' : '💎';
+  if (categoryId === 'necklaces') return has('pearl','bead','rosary') ? '📿' : '💎';
+  if (categoryId === 'bracelets') return has('anklet') ? '✨' : '🔗';
+  if (categoryId === 'rings') return '💍';
+  if (categoryId === 'watches') return has('pocket') ? '🕰️' : '⌚';
+  if (categoryId === 'belts') return has('suspender') ? '👔' : '➰';
+  if (categoryId === 'bags') {
+    if (has('backpack')) return '🎒';
+    if (has('briefcase','laptop')) return '💼';
+    if (has('suitcase','carry-on','garment bag')) return '🧳';
+    if (has('shopping','tote','shopper')) return '🛍️';
+    if (has('clutch','wristlet')) return '👝';
+    return '👜';
+  }
+  if (categoryId === 'gloves') return has('boxing') ? '🥊' : '🧤';
+  if (categoryId === 'scarves') return '🧣';
+  if (categoryId === 'ties') return '👔';
+  if (categoryId === 'hair_accessories') return has('bow','ribbon') ? '🎀' : has('crown','tiara') ? '👑' : '✨';
+  if (categoryId === 'piercings') return '💎';
+  if (categoryId === 'other_accessories') {
+    if (has('phone')) return '📱';
+    if (has('badge','id','pass')) return '🪪';
+    if (has('wallet','card holder')) return '👛';
+    if (has('key')) return '🔑';
+    if (has('umbrella')) return '☂️';
+    if (has('cane','walking stick','crutch')) return '🦯';
+    if (has('mask')) return '😷';
+    if (has('earbud','headphone','headset')) return '🎧';
+    if (has('stethoscope')) return '🩺';
+    if (has('camera')) return '📷';
+    if (has('binocular')) return '🔭';
+    if (has('bead','rosary')) return '📿';
+    if (has('fan')) return '🪭';
+    if (has('lighter')) return '🔥';
+    return '✨';
+  }
+  return '•';
+}
+
+function itemGlyphHtml(categoryId, item) {
+  return `<span class="ghw-item-glyph" aria-hidden="true">${esc(itemGlyph(categoryId,item))}</span>`;
+}
+
 function itemGrid() {
   const category = CATALOG[activeCategory];
   if (!category) return '';
   const q = lc(searchText);
   const items = category.items.filter(item => !q || lc(item.label).includes(q) || lc(item.id).includes(q));
-  return `<div class="ghw-item-grid">${items.map(item => `<button type="button" class="ghw-item ${isSelected(activeCategory,item.id)?'selected':''}" data-ghw-item="${esc(item.id)}"><i class="${esc(category.icon)}"></i><span>${esc(item.label)}</span>${isSelected(activeCategory,item.id)?'<i class="fa-solid fa-check ghw-check"></i>':''}</button>`).join('') || `<div class="ghw-empty">No items match this search.</div>`}</div>`;
+  return `<div class="ghw-item-grid">${items.map(item => `<button type="button" class="ghw-item ${isSelected(activeCategory,item.id)?'selected':''}" data-ghw-item="${esc(item.id)}">${itemGlyphHtml(activeCategory,item)}<span>${esc(item.label)}</span>${isSelected(activeCategory,item.id)?'<i class="fa-solid fa-check ghw-check"></i>':''}</button>`).join('') || `<div class="ghw-empty">No items match this search.</div>`}</div>`;
 }
 
 function selectedSummary() {
@@ -345,7 +545,7 @@ function selectedSummary() {
   for (const [categoryId, category] of Object.entries(CATALOG)) {
     const rows = selectedRows(categoryId);
     if (!rows.length) continue;
-    blocks.push(`<div class="ghw-selected-group"><strong>${esc(category.label)}</strong>${rows.map(row => `<div class="ghw-selected-row"><span>${esc(itemLabel(categoryId,row.id))}</span><select data-ghw-color="${esc(categoryId)}|${esc(row.id)}">${COLORS.map(color => `<option value="${esc(color)}" ${row.color===color?'selected':''}>${esc(color || 'Color unspecified')}</option>`).join('')}</select><button type="button" data-ghw-remove="${esc(categoryId)}|${esc(row.id)}"><i class="fa-solid fa-xmark"></i></button></div>`).join('')}</div>`);
+    blocks.push(`<div class="ghw-selected-group"><strong>${esc(category.label)}</strong>${rows.map(row => { const item = CATALOG[categoryId]?.items?.find(x=>x.id===row.id); return `<div class="ghw-selected-row"><span class="ghw-selected-name">${itemGlyphHtml(categoryId,item)}<em>${esc(itemLabel(categoryId,row.id))}</em></span><select data-ghw-color="${esc(categoryId)}|${esc(row.id)}">${COLORS.map(color => `<option value="${esc(color)}" ${row.color===color?'selected':''}>${esc(color || 'Color unspecified')}</option>`).join('')}</select><button type="button" data-ghw-remove="${esc(categoryId)}|${esc(row.id)}"><i class="fa-solid fa-xmark"></i></button></div>`; }).join('')}</div>`);
   }
   return blocks.length ? `<section class="ghw-selected"><h3>Selected outfit <small>${totalSelected()} items</small></h3>${blocks.join('')}</section>` : `<section class="ghw-selected ghw-selected-empty"><i class="fa-solid fa-shirt"></i><div><b>No garments selected</b><span>If you save now, this person will be explicitly naked. Use “Reset to Unknown” if the outfit is simply unknown.</span></div></section>`;
 }
@@ -461,7 +661,7 @@ function detectionPrompt() {
   const categories = Object.entries(CATALOG).map(([id,c]) => `${id}=${c.label}`).join(', ');
   const examples = Object.entries(CATALOG).map(([id,c]) => `${id}: ${c.items.slice(0,8).map(x=>x.label).join(' | ')}`).join('\n');
   return {
-    systemPrompt: `You analyze fictional roleplay clothing. Return JSON only. Never invent clothing that the recent chat does not establish or strongly imply. Unknown is preferred over guessing. Use mode "naked" only when the text clearly establishes nudity. For set outfits, list only garments/accessories that are actually established. Colors are optional and must be a simple common color word or empty string.`,
+    systemPrompt: `You analyze fictional roleplay clothing. Return JSON only. Never invent clothing that the recent chat does not establish or strongly imply. Unknown is preferred over guessing. Use mode "naked" only when the text clearly establishes total nudity. For set outfits, list only garments/accessories that are actually established. ALSO list category IDs in "absent" only when the text explicitly establishes that category is not being worn (for example topless => top and bra absent; barefoot => footwear absent; "no underwear" => underwear absent). Do not treat unmentioned categories as absent. Colors are optional and must be a simple common color word or empty string.`,
     prompt: `CURRENT PEOPLE:\n${people.map(p=>`- ${p.name}`).join('\n')}\n\nALLOWED CATEGORY IDS:\n${categories}\n\nEXAMPLES OF CATALOG WORDING (choose the closest existing garment label; you do not need an exact example):\n${examples}\n\nRECENT ROLEPLAY:\n${recentChatExcerpt()}\n\nReturn exactly this shape:\n{"people":[{"name":"Aurora","mode":"unknown|naked|set","items":[{"category":"top","label":"Oversized T-shirt","color":"white"}]}]}\nInclude each current person once. Do not add commentary.`
   };
 }
@@ -486,8 +686,9 @@ async function detectFromChat() {
       const person = current.find(p => lc(p.name) === lc(row?.name));
       if (!person) continue;
       const mode = ['unknown','naked','set'].includes(row?.mode) ? row.mode : 'unknown';
-      const outfit = emptyOutfit(mode);
+      const outfit = emptyOutfit(mode, mode === 'set' ? 'partial' : 'complete');
       if (mode === 'set') {
+        outfit.knownAbsent = [...new Set((Array.isArray(row?.absent) ? row.absent : []).map(norm).filter(id => CATALOG[id]))];
         for (const proposed of Array.isArray(row?.items) ? row.items : []) {
           const categoryId = norm(proposed?.category);
           const category = CATALOG[categoryId];
@@ -501,7 +702,7 @@ async function detectFromChat() {
             outfit.items[categoryId] = [{ id:item.id, color }];
           }
         }
-        if (!totalSelected(outfit)) outfit.mode = 'unknown';
+        if (!totalSelected(outfit) && !outfit.knownAbsent.length) outfit.mode = 'unknown';
       }
       proposals.push({ person, outfit });
     }
@@ -593,6 +794,8 @@ function handleClick(event) {
   if (button.matches('[data-ghw-save]')) {
     const count = totalSelected();
     draft.mode = count ? 'set' : 'naked';
+    draft.coverage = 'complete';
+    draft.knownAbsent = [];
     saveOutfit(activePersonKey,draft);
     draft = getOutfit(activePersonKey);
     renderDialog();
