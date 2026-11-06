@@ -1,0 +1,138 @@
+/* Greyhaven Wardrobe v1.3 — wearing styles, reusable outfit presets and costume coverage.
+ * Adds features without replacing the existing Wardrobe state, detection or saved outfits.
+ */
+import { CATALOG } from './catalog.js';
+import { EXPANDED_TOTAL, EXPANDED_COUNTS } from './wardrobe-catalog-expansion.js';
+
+const MODULE = 'greyhaven-wardrobe-features';
+const VERSION = '1.3.0';
+const META = 'greyhavenWardrobeExpanded';
+const SETTINGS = 'greyhavenWardrobeExpansion';
+const PROMPT = 'greyhaven_wardrobe_wearing_details';
+const norm = x => String(x ?? '').trim();
+const esc = x => String(x ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
+const clone = value => { try { return structuredClone(value); } catch { return JSON.parse(JSON.stringify(value)); } };
+const context = () => { try { return globalThis.SillyTavern?.getContext?.() || null; }catch{return null;} };
+const api = () => globalThis.GreyhavenWardrobe;
+const uid = () => { try{return crypto.randomUUID();}catch{return `ghw-${Date.now()}-${Math.random().toString(36).slice(2)}`;} };
+const toast = (kind,message) => {try{globalThis.toastr?.[kind]?.(message);}catch{} };
+
+const COMMON = [
+  ['normal','Worn normally'],
+  ['loose','Worn loosely'],
+  ['adjusted','Adjusted for comfort'],
+];
+const SELECTORS = {
+ bra: [['straps-loose','Straps loosened'],['one-strap','One shoulder strap lowered'],['both-straps','Both straps lowered'],['clasp-open','Back clasp unclasped'],['front-open','Front closure undone'],['shifted','Shifted out of normal position'],['under-top','Worn underneath a top']],
+ underwear: [['high-hips','Pulled high on hips'],['low-hips','Worn low on hips'],['waist-rolled','Waistband rolled over'],['side-adjusted','One side pulled aside'],['thighs','Pulled down to thighs'],['knees','Pulled down to knees'],['ankles','Pulled down to ankles'],['inside-out','Worn inside out']],
+ top: [['tucked','Fully tucked into waistband'],['half-tuck','Front half tucked in'],['untucked','Loose and untucked'],['hem-knotted','Hem tied into a knot'],['cropped-tuck','Hem tucked upward'],['sleeves-up','Sleeves pushed or rolled up'],['one-sleeve','One sleeve slipped off shoulder'],['one-shoulder','One shoulder exposed'],['off-shoulders','Both shoulders lowered'],['buttons-top','Top buttons undone'],['open','Worn open at the front'],['hood-up','Hood pulled up'],['hood-down','Hood resting down'],['half-zipped','Half zipped'],['unzipped','Unzipped'],['around-waist','Tied around waist']],
+ bottom: [['high-waist','Pulled high on waist'],['hips-low','Worn low on hips'],['ultra-low','Waistband pulled very low on hips'],['waist-fold','Waistband folded down'],['cuffed','Cuffs rolled up'],['belt-loose','Belt or drawstring loosened'],['unbuttoned','Waist button undone'],['zip-down','Fly partly unzipped'],['thighs','Lowered to thighs'],['knees','Lowered to knees'],['ankles','Lowered to ankles'],['skirt-hip','Skirt shifted slightly to one hip'],['hem-gathered','Hem gathered or lifted']],
+ onepiece: [['belted','Belt tightened'],['belt-loose','Belt loose'],['one-strap','One shoulder strap lowered'],['straps-down','Both shoulder straps lowered'],['one-shoulder','One shoulder exposed'],['open-back','Back closure open'],['front-open','Front partially open'],['unzipped','Zip partly open'],['hem-gathered','Hem gathered upward'],['waist-wrap','Towel wrapped at waist rather than chest'],['over-shoulders','Draped over shoulders'],['tied-side','Side tie adjusted']],
+ outerwear: [['open','Worn open'],['unbuttoned','Buttons undone'],['half-zipped','Half zipped'],['unzipped','Fully unzipped'],['sleeves-up','Sleeves pushed or rolled up'],['draped','Draped over shoulders without arms in sleeves'],['one-shoulder','Slipped off one shoulder'],['tied-waist','Tied around waist'],['hood-up','Hood up'],['hood-down','Hood down'],['collar-up','Collar popped'],['front-closed','Buttoned or zipped closed']],
+ swim_top: [['straps-loose','Straps loosened'],['one-strap','One strap lowered'],['straps-down','Straps lowered'],['tie-loose','Back or neck tie loosened'],['tie-open','Tie undone'],['shifted','Swim top shifted out of position'],['coverup','Worn under a cover-up']],
+ swim_bottom: [['high-hips','Pulled high on hips'],['low-hips','Worn low on hips'],['side-shift','One side shifted'],['tie-loose','Side ties loose'],['thighs','Pulled down to thighs'],['knees','Pulled down to knees'],['covered','Worn under a cover-up']],
+ sleepwear: [['collar-open','Collar open'],['buttons-open','Upper buttons undone'],['open','Robe worn open'],['belt-loose','Robe belt loosely tied'],['belt-closed','Robe belt tied closed'],['one-shoulder','Off one shoulder'],['sleeves-up','Sleeves pushed up'],['hood-up','Hood up'],['untucked','Loose and untucked'],['hem-knotted','Hem tied up']],
+ socks: [['pulled-up','Pulled all the way up'],['slouch','Scrunched or slouched down'],['rolled','Cuffs folded down'],['one-lowered','One sock pulled lower than the other'],['ankles','Pushed down to ankles']],
+ hosiery: [['pulled-up','Pulled up smoothly'],['lowered-thigh','Rolled down to thighs'],['lowered-knee','Rolled down to knees'],['ankles','Gathered at ankles'],['one-down','One side lower than the other'],['visible-band','Top band visible']],
+ footwear: [['untied','Laces untied'],['loose-laces','Loosely laced'],['heel-out','Heel partly slipped out'],['unbuckled','Buckles unfastened'],['half-zipped','Boot zippers half open'],['folded-cuff','Boot tops folded down'],['carried','Carried in hand rather than worn']],
+ headwear: [['tilted','Tilted to one side'],['backward','Worn backwards'],['loose','Worn loosely'],['pulled-low','Pulled low over forehead'],['above-hair','Resting above hair'],['hood-over','Covered by hood'],['around-neck','Resting around neck instead of head']],
+ eyewear: [['on-head','Pushed up onto hair'],['nose-low','Resting low on nose'],['held','Held in hand'],['hanging','Hanging from collar'],['normal','Worn normally']],
+ earrings: [['single','Only one earring worn'],['mismatched','Worn as mismatched pair'],['layered','Layered with other ear jewelry']],
+ necklaces: [['short','Worn close to neck'],['long','Worn long on chest'],['under-top','Hidden under top'],['outside-top','Visible over top'],['layered','Layered with other necklaces'],['clasp-front','Clasp visible at front']],
+ bracelets: [['loose','Loose on wrist'],['high-arm','Pushed higher on forearm'],['stacked','Stacked with other bracelets'],['ankle','Worn around ankle']],
+ rings: [['stacked','Stacked with other rings'],['pinky','Worn on pinky'],['index','Worn on index finger'],['middle','Worn on middle finger'],['thumb','Worn on thumb'],['ring-finger','Worn on ring finger']],
+ watches: [['left','Worn on left wrist'],['right','Worn on right wrist'],['loose','Loose around wrist'],['over-sleeve','Worn over sleeve']],
+ belts: [['high-waist','Fastened at waist'],['low-hips','Slung low on hips'],['loose','Loosely fastened'],['unbuckled','Unbuckled'],['hanging','Hanging through belt loops'],['over-coat','Fastened over outerwear']],
+ bags: [['shoulder','Over one shoulder'],['crossbody','Across torso'],['front','Worn across the front'],['back','Worn behind back'],['hand','Carried in hand'],['elbow','Held on crook of elbow'],['waist','Worn around waist'],['open','Bag open']],
+ gloves: [['one-off','One glove removed'],['cuffs-folded','Cuffs folded'],['half-on','Partly pulled on'],['carried','Held in hand']],
+ scarves: [['loose','Loosely draped around neck'],['double-wrap','Wrapped twice around neck'],['over-head','Draped over head'],['shoulders','Draped over shoulders'],['face','Pulled up over lower face'],['hair-tie','Tied around hair'],['waist','Tied around waist']],
+ ties: [['loose','Knot loosened'],['untied','Untied around neck'],['bow-loose','Bow tie slightly loosened'],['short','Tied short'],['under-collar','Tucked beneath collar']],
+ hair_accessories: [['top','Placed at crown'],['back','Worn at back of head'],['side','Worn to one side'],['loose','Loosely secured'],['half-up','Securing half-up hairstyle']],
+ piercings: [['left','Worn on left side'],['right','Worn on right side'],['double','Paired with second piercing'],['hidden','Concealed under clothing']],
+ other_accessories: [['hand','Held in hand'],['wrist','Worn on wrist'],['neck','Hanging from neck'],['pocket','Tucked into pocket'],['shoulder','Carried over shoulder'],['waist','Worn at waist'],['hair','Wrapped around hair'],['folded','Folded or stowed']],
+ costumes: [['full','Complete costume worn'],['partial','Only selected costume pieces worn'],['casual','Costume layered over normal clothes'],['hood-up','Costume hood raised'],['mask-up','Costume mask lifted'],['mask-down','Costume mask worn'],['cape-shoulder','Cape draped over one shoulder'],['unfastened','Costume partly unfastened'],['helmet-off','Helmet or headpiece removed'],['gloves-off','Costume gloves removed']],
+};
+
+function optionsFor(cat,item){
+  const itemLabel=String(CATALOG[cat]?.items?.find(x=>x.id===item)?.label || '').toLowerCase();
+  let values=SELECTORS[cat] || COMMON;
+  // Only show garment-relevant choices, particularly for towels, dresses, caps and jewelry.
+  if(cat==='onepiece' && /towel/.test(itemLabel)) values=[['normal','Wrapped normally'],['waist-wrap','Wrapped around waist'],['chest-wrap','Wrapped around chest'],['shoulders','Draped over shoulders'],['loose','Tied loosely']];
+  else if(cat==='top' && /hoodie/.test(itemLabel)) values=values.filter(x=>!['buttons-top','open'].includes(x[0]));
+  else if(cat==='top' && /tee|t-shirt|shirt|blouse|sweater|polo|hoodie|cardigan/.test(itemLabel)) values=values.filter(x=>!['hood-up','hood-down','half-zipped','unzipped'].includes(x[0]) || /hoodie|zip|cardigan/.test(itemLabel));
+  else if(cat==='bottom' && /skirt|kilt|sarong/.test(itemLabel)) values=values.filter(x=>!['unbuttoned','zip-down','cuffed'].includes(x[0]));
+  else if(cat==='headwear' && /towel|turban|bonnet|veil|crown|tiara|hijab/.test(itemLabel)) values=values.filter(x=>!['backward','pulled-low'].includes(x[0]));
+  else if(cat==='footwear' && /barefoot/.test(itemLabel)) values=[];
+  else if(cat==='bra' && /adhesive|strapless|bandeau/.test(itemLabel)) values=values.filter(x=>!['straps-loose','one-strap','both-straps'].includes(x[0]));
+  return [['normal','Worn normally (no extra prompt text)'],...values.filter(x=>x[0]!=='normal')];
+}
+const optionLabel=(cat,item,key)=>optionsFor(cat,item).find(([value])=>value===key)?.[1] || '';
+const styleKey=(cat,id)=>`${cat}|${id}`;
+const meta=()=>{const c=context();if(!c?.chatMetadata)return null;const root=c.chatMetadata[META] ||= {version:1,styles:{}};root.styles ||= {};return root;};
+function persistMeta(){const c=context(),m=meta();if(!c?.chatMetadata||!m)return;try{c.updateChatMetadata?.({[META]:m});c.saveMetadataDebounced?.();}catch(error){console.warn(`[${MODULE}] metadata saving`,error);} }
+function personStyles(key,create=true){const root=meta();if(!root||!key)return {};if(create)root.styles[key] ||= {};return root.styles[key] || {};}
+function currentPerson(){return document.querySelector('#ghw-dialog [data-ghw-person]')?.value || '';}
+function getSettings(){const c=context();if(!c?.extensionSettings)return null;c.extensionSettings[SETTINGS] ||= {version:1,presets:{}};c.extensionSettings[SETTINGS].presets ||= {};return c.extensionSettings[SETTINGS];}
+function persistSettings(){try{context()?.saveSettingsDebounced?.();}catch(e){console.warn(`[${MODULE}] settings saving`,e);}}
+function personPresets(key){const root=getSettings();if(!root || !key)return [];if(!Array.isArray(root.presets[key]))root.presets[key]=[];return root.presets[key];}
+function colorRowsFromScreen(){const result={mode:'set',coverage:'complete',knownAbsent:[],items:{},updatedAt:Date.now()};for(const row of document.querySelectorAll('#ghw-dialog [data-ghw-color]')){const raw=row.dataset.ghwColor||'';const sep=raw.indexOf('|');if(sep<1)continue;const cat=raw.slice(0,sep),id=raw.slice(sep+1);if(!CATALOG[cat] || !CATALOG[cat].items.some(x=>x.id===id))continue;(result.items[cat] ||= []).push({id,color:row.value||''});}result.mode=Object.values(result.items).some(x=>x.length)?'set':'naked';return result;}
+function styleRowsFromScreen(){const result={...personStyles(currentPerson(),false)};for(const el of document.querySelectorAll('#ghw-dialog [data-ghwx-style]')){result[el.dataset.ghwxStyle]=el.value||'normal';}return result;}
+function storePreset(){const key=currentPerson();if(!key){toast('warning','Select a character.');return;}const outfit=colorRowsFromScreen(),styles=styleRowsFromScreen();const proposed=prompt('Name this outfit preset (saved for this character):','Favorite outfit');const name=norm(proposed).slice(0,64);if(!name)return;const presets=personPresets(key);const existing=presets.find(x=>x.name.toLowerCase()===name.toLowerCase());if(existing){if(!confirm(`Replace saved preset “${name}”?`))return;Object.assign(existing,{outfit:clone(outfit),styles:clone(styles),updatedAt:Date.now()});}else presets.push({id:uid(),name,outfit:clone(outfit),styles:clone(styles),createdAt:Date.now()});persistSettings();document.querySelector('#ghwx-panel')?.remove();decorate();const sel=document.querySelector('[data-ghwx-preset]');if(sel)sel.value=existing?.id || presets[presets.length-1]?.id || '';toast('success',`Saved preset: ${name}`);}
+function applyPreset(){const key=currentPerson(),sel=document.querySelector('#ghw-dialog [data-ghwx-preset]'),presets=personPresets(key);const preset=presets.find(x=>x.id===sel?.value);if(!preset){toast('warning','Choose a preset first.');return;}api()?.setOutfit?.(key,clone(preset.outfit));const styles=personStyles(key,true);for(const k of Object.keys(styles))delete styles[k];Object.assign(styles,clone(preset.styles||{}));persistMeta();syncPrompt();const picker=document.querySelector('#ghw-dialog [data-ghw-person]');if(picker){picker.value=key;picker.dispatchEvent(new Event('change',{bubbles:true}));}setTimeout(decorate,0);toast('success',`Applied outfit: ${preset.name}`);}
+function removePreset(){const key=currentPerson(),sel=document.querySelector('#ghw-dialog [data-ghwx-preset]');const presets=personPresets(key),idx=presets.findIndex(x=>x.id===sel?.value);if(idx<0)return;if(!confirm(`Delete saved preset “${presets[idx].name}”?`))return;presets.splice(idx,1);persistSettings();document.querySelector('#ghwx-panel')?.remove();decorate();toast('success','Saved outfit preset deleted.');}
+function describeCostume(cat,item,style){const label=CATALOG[cat]?.items?.find(x=>x.id===item)?.label||item;return `${label}${style && style!=='normal'?`, ${optionLabel(cat,item,style).toLowerCase()}`:''}`;}
+function relevantOutfitKeys(){const c=context();if(!c)return new Set();const keys=new Set();const user=norm(c.name1||c.user_name||'User').toLowerCase();keys.add(`persona:${user}`);const chars=c.characters||[];const keyFor=ch=>ch?.avatar||ch?.data?.avatar?`character:${encodeURIComponent(norm(ch?.avatar||ch?.data?.avatar))}`:`character-name:${norm(ch?.name).toLowerCase()}`;
+ if(Number.isInteger(Number(c.characterId))&&chars[Number(c.characterId)])keys.add(keyFor(chars[Number(c.characterId)]));
+ if(c.groupId&&Array.isArray(c.groups)){const group=c.groups.find(x=>String(x.id)===String(c.groupId));for(const member of group?.members||[]){const avatar=typeof member==='string'?member:norm(member?.avatar||member?.name);const ch=chars.find(x=>norm(x.avatar)===avatar||norm(x.name).toLowerCase()===norm(member?.name||member).toLowerCase());if(ch)keys.add(keyFor(ch));}}
+ for(const msg of (Array.isArray(c.chat)?c.chat.slice(-30):[])){const name=norm(msg?.name||msg?.display_name||msg?.speaker).toLowerCase();const ch=chars.find(x=>norm(x.name).toLowerCase()===name);if(ch)keys.add(keyFor(ch));}return keys;}
+function personName(key){const c=context();if(key.startsWith('persona:'))return norm(c?.name1||c?.user_name)||key.slice(8);const chars=c?.characters||[];const ch=chars.find(x=>{const avatar=norm(x?.avatar||x?.data?.avatar);return (avatar&&`character:${encodeURIComponent(avatar)}`===key) || `character-name:${norm(x?.name).toLowerCase()}`===key;});return ch?.name||'';}
+function extraPrompt(){const state=api()?.getState?.(),keys=relevantOutfitKeys();if(!state?.outfits)return '';const lines=[];for(const key of keys){const outfit=state.outfits[key];if(!outfit||outfit.mode!=='set')continue;const styles=personStyles(key,false);const name=personName(key)||'Character';let costume=[];for(const [cat,items]of Object.entries(outfit.items||{})){for(const row of items||[]){const item=CATALOG[cat]?.items?.find(x=>x.id===row.id);if(!item)continue;const style=styles[styleKey(cat,row.id)];if(style&&style!=='normal'&&optionLabel(cat,row.id,style))lines.push(`${name}: ${row.color?row.color+' ':''}${item.label} — ${optionLabel(cat,row.id,style).toLowerCase()}.`);if(cat==='costumes')costume.push(item.label);if(cat==='onepiece'&&/towel/i.test(item.label)){if(style==='waist-wrap')lines.push(`${name}'s ${item.label} is wrapped around the WAIST: it covers the lower body but DOES NOT cover the torso or chest.`);else if(style==='shoulders')lines.push(`${name}'s ${item.label} is draped over shoulders, not secured around the body; do not assume full coverage.`);}}}
+ if(costume.length){lines.push(`${name} is wearing selected costume pieces (${costume.join(', ')}). Full-body costumes count as clothing coverage for covered areas; do not assume uncovered torso or legs merely because a separate top/bottom slot is empty. Partial accessories, masks, hats or wings only cover what they physically cover. Do not overwrite other actually worn clothing.`);}}
+ if(!lines.length)return '';return ['[Greyhaven Wardrobe — precise garment wearing styles and costume coverage; overrides any generic garment-position assumptions in basic wardrobe state.]','Only the specified item adjustments differ from normal wear. Do not turn these styles into actions the character did not take.',...lines].join('\n');}
+function syncPrompt(){const c=context();if(!c?.setExtensionPrompt)return;try{c.setExtensionPrompt(PROMPT,extraPrompt(),1,1,false,0);}catch(e){console.warn(`[${MODULE}] context injection`,e);}}
+function addStyleControls(dialog){const key=currentPerson();if(!key)return;const styles=personStyles(key,false);for(const row of dialog.querySelectorAll('.ghw-selected-row')){const color=row.querySelector('[data-ghw-color]');if(!color)continue;const entry=color.dataset.ghwColor;const i=entry.indexOf('|');if(i<0)continue;const cat=entry.slice(0,i),id=entry.slice(i+1);if(row.querySelector('[data-ghwx-style]'))continue;const choices=optionsFor(cat,id);const sel=document.createElement('select');sel.className='ghwx-style';sel.setAttribute('aria-label','How it is worn');sel.dataset.ghwxStyle=styleKey(cat,id);sel.innerHTML=choices.map(([value,label])=>`<option value="${esc(value)}"${styles[styleKey(cat,id)]===value?' selected':''}>${esc(label)}</option>`).join('');const remove=row.querySelector('[data-ghw-remove]');if(remove)row.insertBefore(sel,remove);else row.appendChild(sel);}}
+function addPresetPanel(dialog){const bar=dialog.querySelector('.ghw-tools');if(!bar||bar.querySelector('#ghwx-panel'))return;const key=currentPerson(),presets=personPresets(key);const panel=document.createElement('section');panel.id='ghwx-panel';panel.className='ghwx-panel';panel.innerHTML=`<label class="ghwx-label"><i class="fa-solid fa-bookmark"></i> Saved outfits <select data-ghwx-preset aria-label="Saved outfit presets"><option value="">Choose an outfit preset…</option>${presets.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></label><div class="ghwx-actions"><button type="button" data-ghwx-save title="Save the outfit currently shown in the editor as a reusable preset"><i class="fa-solid fa-floppy-disk"></i> Save preset</button><button type="button" data-ghwx-apply><i class="fa-solid fa-shirt"></i> Wear preset</button><button type="button" data-ghwx-delete title="Delete selected saved preset"><i class="fa-solid fa-trash"></i></button></div><small>Reusable for this character across chats. Current outfit stays chat-specific.</small>`;bar.appendChild(panel);}
+let scheduled=false;
+function decorate(){const d=document.querySelector('#ghw-dialog');if(!d||(!d.open&&!d.hasAttribute('open')))return;addStyleControls(d);addPresetPanel(d);limitGrid(d);}
+function scheduleDecorate(){if(scheduled||!document.querySelector('#ghw-dialog'))return;scheduled=true;queueMicrotask(()=>{scheduled=false;decorate();});}
+function onChange(event){const target=event.target;if(!target?.matches?.('[data-ghwx-style]'))return;const key=currentPerson(),raw=target.dataset.ghwxStyle,styles=personStyles(key,true);if(target.value==='normal')delete styles[raw];else styles[raw]=target.value;persistMeta();syncPrompt();}
+function onClick(event){const button=event.target.closest?.('button');if(!button)return;if(button.matches('[data-ghwx-save]'))storePreset();else if(button.matches('[data-ghwx-apply]'))applyPreset();else if(button.matches('[data-ghwx-delete]'))removePreset();else if(button.matches('[data-ghw-save],[data-ghw-clear],[data-ghw-unknown],[data-ghw-review-apply]'))setTimeout(syncPrompt,0);}
+function onClickCapture(event){
+  const button=event.target.closest?.('button');
+  if(!button)return;
+  const key=currentPerson();
+  if(button.matches('[data-ghw-clear],[data-ghw-unknown]')){
+    const styles=personStyles(key,false);
+    if(Object.keys(styles).length){for(const k of Object.keys(styles))delete styles[k];persistMeta();setTimeout(syncPrompt,0);}
+    return;
+  }
+  if(button.matches('[data-ghw-review-apply]')){
+    const dialog=button.closest('dialog');
+    for(const input of dialog?.querySelectorAll('input[type="checkbox"]:checked')||[]){
+      const p=dialog?._proposals?.[Number(input.value)];
+      if(!p?.person?.key)continue;
+      const styles=personStyles(p.person.key,false);
+      for(const k of Object.keys(styles))delete styles[k];
+    }
+    persistMeta();setTimeout(syncPrompt,0);return;
+  }
+  const styles=personStyles(key,false);
+  let changed=false;
+  const del=(styleId)=>{if(Object.prototype.hasOwnProperty.call(styles,styleId)){delete styles[styleId];changed=true;}};
+  if(button.dataset.ghwRemove){
+    const [cat,id]=button.dataset.ghwRemove.split('|');del(styleKey(cat,id));
+  }else if(button.dataset.ghwItem){
+    const cat=document.querySelector('#ghw-dialog .ghw-category.active')?.dataset.ghwCategory||'';
+    const id=button.dataset.ghwItem;
+    if(button.classList.contains('selected'))del(styleKey(cat,id));
+    else if(cat && !CATALOG[cat]?.multi){
+      for(const oldKey of Object.keys(styles))if(oldKey.startsWith(`${cat}|`) && oldKey!==styleKey(cat,id))del(oldKey);
+      if(cat==='onepiece')for(const oldKey of Object.keys(styles))if(oldKey.startsWith('top|')||oldKey.startsWith('bottom|'))del(oldKey);
+      if(cat==='top'||cat==='bottom')for(const oldKey of Object.keys(styles))if(oldKey.startsWith('onepiece|'))del(oldKey);
+    }
+  }
+  if(changed){persistMeta();setTimeout(syncPrompt,0);}
+}
+function bind(){document.addEventListener('change',onChange);document.addEventListener('click',onClickCapture,true);document.addEventListener('click',onClick);const observer=new MutationObserver(scheduleDecorate);observer.observe(document.body,{subtree:true,childList:true});const c=context();if(c?.eventSource&&c?.eventTypes){for(const key of ['GENERATION_STARTED','CHAT_CHANGED','CHAT_CREATED','PERSONA_CHANGED','GROUP_UPDATED','MESSAGE_UPDATED']){const event=c.eventTypes[key];if(event)c.eventSource.on(event,()=>{syncPrompt();scheduleDecorate();});}}}
+async function main(){for(let i=0;i<250;i++){if(api()?.getCatalog&&document.body&&context()?.chatMetadata)break;await new Promise(r=>setTimeout(r,40));}bind();syncPrompt();decorate();globalThis.GreyhavenWardrobeExpansion={version:VERSION,counts:clone(EXPANDED_COUNTS),total:EXPANDED_TOTAL,getPresets:key=>clone(personPresets(key)),getStylePrompt:extraPrompt};console.info(`[${MODULE}] v${VERSION}: ${EXPANDED_TOTAL} clothing options in ${Object.keys(CATALOG).length} categories; presets & wearing styles ready.`);}
+main().catch(e=>console.error(`[${MODULE}] failed`,e));

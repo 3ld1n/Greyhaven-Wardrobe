@@ -1,10 +1,10 @@
 {
   "display_name": "Greyhaven Wardrobe",
   "loading_order": 855,
-  "js": "index.js",
-  "css": "style.css",
+  "js": "enhanced-entry.js",
+  "css": "wardrobe-features.css",
   "author": "Eldin + ChatGPT",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "auto_update": false,
   "minimum_client_version": "1.13.3"
 }
