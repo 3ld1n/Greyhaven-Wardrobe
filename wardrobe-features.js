@@ -5,7 +5,7 @@ import { CATALOG } from './catalog.js';
 import { EXPANDED_TOTAL, EXPANDED_COUNTS } from './wardrobe-catalog-expansion.js';
 
 const MODULE = 'greyhaven-wardrobe-features';
-const VERSION = '1.4.0';
+const VERSION = '1.4.1';
 const META = 'greyhavenWardrobeExpanded';
 const SETTINGS = 'greyhavenWardrobeExpansion';
 const PROMPT = 'greyhaven_wardrobe_wearing_details';
@@ -286,11 +286,15 @@ function limitGrid(dialog){
   if(!grid||!category)return;
   const items=[...grid.querySelectorAll('[data-ghw-item]')];
   const limit=visibleLimits.get(category)||150;
-  for(let i=0;i<items.length;i++)items[i].hidden=i>=limit;
+  for(let i=0;i<items.length;i++){
+    const shouldHide=i>=limit;
+    if(items[i].hidden!==shouldHide)items[i].hidden=shouldHide;
+  }
   let more=grid.querySelector('[data-ghwx-more]');
   if(items.length<=limit){more?.remove();return;}
   if(!more){more=document.createElement('button');more.type='button';more.className='ghwx-more';more.dataset.ghwxMore='';grid.appendChild(more);}
-  more.textContent=`Show more (${items.length-limit} remaining)`;
+  const label=`Show more (${items.length-limit} remaining)`;
+  if(more.textContent!==label)more.textContent=label;
 }
 let scheduled=false;
 function decorate(){
@@ -299,7 +303,15 @@ function decorate(){
   if(!organizePersonOptions(d))return;
   addStyleControls(d);addPresetPanel(d);limitGrid(d);restoreScroll();
 }
-function scheduleDecorate(){if(scheduled||!document.querySelector('#ghw-dialog'))return;scheduled=true;queueMicrotask(()=>{scheduled=false;decorate();});}
+function scheduleDecorate(){
+  if(scheduled||!document.querySelector('#ghw-dialog'))return;
+  scheduled=true;
+  // Throttle to one pass per animation frame; never chain observer callbacks through microtasks.
+  requestAnimationFrame(()=>{
+    scheduled=false;
+    if(document.querySelector('#ghw-dialog'))decorate();
+  });
+}
 
 function onChange(event){const target=event.target;if(!target?.matches?.('[data-ghwx-style]'))return;const key=currentPerson(),raw=target.dataset.ghwxStyle,styles=personStyles(key,true);if(target.value==='normal')delete styles[raw];else styles[raw]=target.value;persistMeta();syncPrompt();}
 function onClick(event){
@@ -495,8 +507,42 @@ function bind(){
   },true);
   document.addEventListener('click',onClickCapture,true);
   document.addEventListener('click',onClick);
-  const observer=new MutationObserver(scheduleDecorate);
-  observer.observe(document.body,{subtree:true,childList:true});
+  // Important: DO NOT observe document.body with subtree:true.
+  // That watches our own DOM insertions and every other SillyTavern extension, and
+  // can trigger a runaway observer/render loop that freezes the whole page.
+  // Instead, observe only a dialog being added/removed and its direct shell replacement.
+  let dialogObserved=null;
+  let dialogObserver=null;
+  const observeDialog=()=>{
+    const next=document.querySelector('#ghw-dialog');
+    if(next===dialogObserved)return;
+    dialogObserver?.disconnect();
+    dialogObserver=null;
+    dialogObserved=next;
+    if(!next)return;
+    dialogObserver=new MutationObserver(records=>{
+      // The core rebuilds the editor with dialog.innerHTML = ... .
+      // Style selects/buttons inserted *inside* the shell do not match this.
+      if(records.some(record=>record.target===next && record.type==='childList'))scheduleDecorate();
+    });
+    dialogObserver.observe(next,{childList:true});
+    scheduleDecorate();
+  };
+  const bodyObserver=new MutationObserver(records=>{
+    // Only direct children of <body>; ignore every mutation inside Wardrobe,
+    // chat messages, other app views, or third-party extensions.
+    if(records.some(record=>[...record.addedNodes,...record.removedNodes]
+      .some(node=>node.nodeType===1 && (node.id==='ghw-dialog'||node.querySelector?.('#ghw-dialog'))))){
+      observeDialog();
+    }
+  });
+  bodyObserver.observe(document.body,{childList:true});
+  observeDialog();
+  // Search replaces only the inner grid, not the whole dialog.
+  // Refresh the page-length limiter after the core search handler runs.
+  document.addEventListener('input',event=>{
+    if(event.target?.matches?.('#ghw-dialog [data-ghw-search]'))scheduleDecorate();
+  });
   const c=context();if(c?.eventSource&&c?.eventTypes){
     for(const key of ['GENERATION_STARTED','CHAT_CHANGED','CHAT_CREATED','PERSONA_CHANGED','GROUP_UPDATED','MESSAGE_UPDATED']){
       const event=c.eventTypes[key];if(event)c.eventSource.on(event,()=>{syncPrompt();scheduleDecorate();});
